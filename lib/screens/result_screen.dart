@@ -1,0 +1,279 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:share_plus/share_plus.dart';
+import '../services/app_provider.dart';
+
+class ResultScreen extends StatefulWidget {
+  const ResultScreen({super.key});
+
+  @override
+  State<ResultScreen> createState() => _ResultScreenState();
+}
+
+class _ResultScreenState extends State<ResultScreen> {
+  final FlutterTts _flutterTts = FlutterTts();
+  bool _isSpeaking = false;
+
+  @override
+  void dispose() {
+    _flutterTts.stop();
+    super.dispose();
+  }
+
+  Future<void> _speak(String text, String language) async {
+    if (_isSpeaking) {
+      await _flutterTts.stop();
+      setState(() => _isSpeaking = false);
+    } else {
+      setState(() => _isSpeaking = true);
+      
+      // Try to set language for Twi (Akan) if available, else fallback to English
+      // Note: 'ak-GH' is the BCP 47 code for Akan (Twi) in Ghana.
+      // Supported languages vary by device TTS engine (e.g., Google TTS).
+      if (language == 'Twi') {
+        await _flutterTts.setLanguage("ak-GH");
+      } else {
+        await _flutterTts.setLanguage("en-US");
+      }
+      
+      await _flutterTts.setPitch(1.0);
+      await _flutterTts.setSpeechRate(0.5); // Slightly slower for better clarity
+      await _flutterTts.speak(text);
+      
+      _flutterTts.setCompletionHandler(() {
+        if (mounted) setState(() => _isSpeaking = false);
+      });
+    }
+  }
+
+  void _shareReport(String disease, String treatment) {
+    Share.share(
+      'ca_ai Health Report\n\nDisease: $disease\n\nRecommended Treatment: $treatment\n\nDownload ca_ai to protect your crops!',
+      subject: 'Cabbage Health Report',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = Provider.of<AppProvider>(context);
+    final prediction = provider.currentPrediction;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isTwi = provider.language == 'Twi';
+
+    if (prediction == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Result')),
+        body: const Center(child: Text('No prediction found.')),
+      );
+    }
+
+    final isHealthy = prediction.diseaseName.toLowerCase().contains('healthy') || 
+                      prediction.diseaseName.toLowerCase().contains('nhyehyɛe');
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 350,
+            pinned: true,
+            backgroundColor: isHealthy ? Colors.green : Colors.orange,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Hero(
+                tag: prediction.imagePath,
+                child: Image.file(
+                  File(prediction.imagePath),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.share_rounded, color: Colors.white),
+                onPressed: () => _shareReport(prediction.diseaseName, prediction.treatment),
+              ),
+            ],
+          ),
+          SliverToBoxAdapter(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Diagnosis Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isTwi ? 'NHWEHWƐMU' : 'DIAGNOSIS',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            Text(
+                              prediction.diseaseName,
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w900,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      _buildConfidenceGauge(prediction.confidence, colorScheme),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 2. Voice Advice Button
+                  InkWell(
+                    onTap: () => _speak(
+                      '${prediction.diseaseName}. ${prediction.description}. ${isTwi ? 'Sɛnea yɛsa yadeɛ yi ne sɛ' : 'Treatment'}: ${prediction.treatment}',
+                      provider.language
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isSpeaking ? Icons.stop_circle_rounded : Icons.play_circle_fill_rounded,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              _isSpeaking 
+                                ? (isTwi ? 'Gyae tie' : 'Stop Listening') 
+                                : (isTwi ? 'Tie afutuo no wɔ Twi mu' : 'Listen to Advice'),
+                              style: TextStyle(
+                                color: colorScheme.primary, 
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // 3. Information Sections
+                  _buildInfoCard(
+                    context,
+                    Icons.info_outline_rounded,
+                    isTwi ? 'Nkyerɛmu' : 'Description',
+                    prediction.description,
+                    colorScheme.secondary,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoCard(
+                    context,
+                    Icons.healing_rounded,
+                    isTwi ? 'Sɛnea yɛsa yadeɛ no' : 'Recommended Treatment',
+                    prediction.treatment,
+                    Colors.orange,
+                  ),
+                  
+                  const SizedBox(height: 40),
+                  
+                  // 4. Action Buttons
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.dashboard_rounded),
+                      label: Text(isTwi ? 'Kɔ Fie' : 'Back to Dashboard'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConfidenceGauge(double confidence, ColorScheme colorScheme) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          width: 70,
+          height: 70,
+          child: CircularProgressIndicator(
+            value: confidence,
+            strokeWidth: 8,
+            backgroundColor: colorScheme.surfaceVariant,
+            color: confidence > 0.7 ? Colors.green : Colors.orange,
+            strokeCap: StrokeCap.round,
+          ),
+        ),
+        Text(
+          '${(confidence * 100).toInt()}%',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoCard(BuildContext context, IconData icon, String title, String content, Color color) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(color: color.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title, 
+                  style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(content, style: const TextStyle(fontSize: 15, height: 1.6)),
+        ],
+      ),
+    );
+  }
+}
