@@ -90,7 +90,7 @@ class HomeScreen extends StatelessWidget {
                     flexibleSpace: FlexibleSpaceBar(
                       centerTitle: true,
                       title: Text(
-                        'DASHBOARD',
+                        provider.tr('DASHBOARD'),
                         style: TextStyle(
                           color: colorScheme.primary,
                           fontWeight: FontWeight.w900,
@@ -131,7 +131,7 @@ class HomeScreen extends StatelessWidget {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     Text(
-                                      provider.language == 'Twi' ? 'Hwɛ wo nnɔbae ahoɔden.' : 'Scan your leaves for health status.',
+                                      provider.tr('Scan your leaves for health status.'),
                                       style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -155,7 +155,7 @@ class HomeScreen extends StatelessWidget {
                                       decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
                                     ),
                                     const SizedBox(width: 8),
-                                    const Text('LIVE', style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    Text(provider.tr('LIVE'), style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                                   ],
                                 ),
                               ),
@@ -174,11 +174,11 @@ class HomeScreen extends StatelessWidget {
                                 child: InkWell(
                                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const WeatherScreen())),
                                   borderRadius: BorderRadius.circular(20),
-                                  child: _buildCompactMetric(context, Icons.wb_sunny_rounded, '28°C', 'Sunny'),
+                                  child: _buildCompactMetric(context, Icons.wb_sunny_rounded, '28°C', provider.tr('Sunny')),
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Expanded(child: _buildCompactMetric(context, Icons.analytics_rounded, provider.history.length.toString(), provider.language == 'Twi' ? 'Nhwehwɛmu' : 'Scans')),
+                              Expanded(child: _buildCompactMetric(context, Icons.analytics_rounded, provider.history.length.toString(), provider.tr('Scans'))),
                             ],
                           ),
                           const SizedBox(height: 24),
@@ -189,7 +189,7 @@ class HomeScreen extends StatelessWidget {
 
                           // 6. Action Tools
                           Text(
-                            provider.language == 'Twi' ? 'Nhwehwɛmu Akwan' : 'Diagnosis Tools',
+                            provider.tr('Diagnosis Tools'),
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 12),
@@ -199,7 +199,7 @@ class HomeScreen extends StatelessWidget {
                               Expanded(
                                 child: _buildRefinedAction(
                                   context,
-                                  provider.language == 'Twi' ? 'Kamera' : 'Camera',
+                                  provider.tr('Camera'),
                                   Icons.camera_alt_rounded,
                                   colorScheme.primary,
                                   () async {
@@ -214,7 +214,7 @@ class HomeScreen extends StatelessWidget {
                               Expanded(
                                 child: _buildRefinedAction(
                                   context,
-                                  provider.language == 'Twi' ? 'Adaka' : 'Gallery',
+                                  provider.tr('Gallery'),
                                   Icons.photo_library_rounded,
                                   colorScheme.secondary,
                                   () async {
@@ -235,14 +235,14 @@ class HomeScreen extends StatelessWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(provider.language == 'Twi' ? 'Nhwehwɛmu a Atwam' : 'Recent Scans', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                                Text(provider.tr('Recent Scans'), style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                                 TextButton(
                                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const HistoryScreen())),
-                                  child: Text(provider.language == 'Twi' ? 'Hwɛ ne nyinaa' : 'View all'),
+                                  child: Text(provider.tr('View all')),
                                 ),
                               ],
                             ),
-                            _buildCompactHistoryList(provider.history),
+                            _buildCompactHistoryList(context, provider),
                           ],
                         ],
                       ),
@@ -252,7 +252,7 @@ class HomeScreen extends StatelessWidget {
               ),
               
               if (provider.isLoading)
-                _buildAnalysisOverlay(context),
+                _buildAnalysisOverlay(context, provider),
             ],
           );
         },
@@ -260,7 +260,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAnalysisOverlay(BuildContext context) {
+  Widget _buildAnalysisOverlay(BuildContext context, AppProvider provider) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
@@ -280,13 +280,13 @@ class HomeScreen extends StatelessWidget {
                 Shimmer.fromColors(
                   baseColor: isDark ? Colors.white : Colors.black,
                   highlightColor: Colors.grey,
-                  child: const Text(
-                    'ANALYZING LEAF...',
-                    style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 18),
+                  child: Text(
+                    provider.tr('ANALYZING LEAF...'),
+                    style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 18),
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text('Our AI is detecting diseases', style: TextStyle(color: Colors.grey)),
+                Text(provider.tr('Our AI is detecting diseases'), style: const TextStyle(color: Colors.grey)),
               ],
             ),
           ),
@@ -320,7 +320,7 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        provider.language == 'Twi' ? 'Afutuo' : 'Daily Recommendation', 
+                        provider.tr('Daily Recommendation'), 
                         style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -331,7 +331,7 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ScheduleScreen())),
-                child: Text(provider.language == 'Twi' ? 'Hyehyɛ foforɔ' : 'Plan More', style: TextStyle(fontSize: 12, color: colorScheme.primary, fontWeight: FontWeight.bold)),
+                child: Text(provider.tr('Plan More'), style: TextStyle(fontSize: 12, color: colorScheme.primary, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -355,7 +355,7 @@ class HomeScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(suggestion, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
-                    Text(provider.language == 'Twi' ? 'Ɛgyina nnɔbae mmerɛ so' : 'Based on crop cycle', style: const TextStyle(fontSize: 12, color: Colors.grey), overflow: TextOverflow.ellipsis),
+                    Text(provider.tr('Based on crop cycle'), style: const TextStyle(fontSize: 12, color: Colors.grey), overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -420,7 +420,8 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCompactHistoryList(List<dynamic> history) {
+  Widget _buildCompactHistoryList(BuildContext context, AppProvider provider) {
+    final history = provider.history;
     return ListView.builder(
       shrinkWrap: true,
       padding: EdgeInsets.zero,
@@ -437,12 +438,16 @@ class HomeScreen extends StatelessWidget {
           ),
           child: ListTile(
             onTap: () {
-              // Could set current prediction and navigate to ResultScreen
+              provider.setCurrentPrediction(scan);
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const ResultScreen()));
             },
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(File(scan.imagePath), width: 50, height: 50, fit: BoxFit.cover),
+            leading: Hero(
+              tag: scan.imagePath,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(File(scan.imagePath), width: 50, height: 50, fit: BoxFit.cover),
+              ),
             ),
             title: Text(scan.diseaseName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis),
             subtitle: Text(DateFormat('MMM dd, hh:mm a').format(scan.dateTime), style: const TextStyle(fontSize: 12)),
@@ -495,7 +500,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      provider.userName == 'Guest' ? 'Guest User' : provider.userName, 
+                      provider.userName == 'Guest' ? provider.tr('Guest User') : provider.userName, 
                       style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -507,7 +512,7 @@ class HomeScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        provider.userName == 'Guest' ? 'Standard Access' : 'Pro Farmer', 
+                        provider.userName == 'Guest' ? provider.tr('Standard Access') : provider.tr('Pro Farmer'), 
                         style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -520,17 +525,17 @@ class HomeScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   physics: const BouncingScrollPhysics(),
                   children: [
-                    _drawerTile(context, Icons.dashboard_rounded, provider.language == 'Twi' ? 'Efie' : 'Dashboard', null, true),
-                    _drawerTile(context, Icons.cloud_rounded, provider.language == 'Twi' ? 'Wiem mberɛ' : 'Weather', const WeatherScreen(), false),
-                    _drawerTile(context, Icons.event_note_rounded, provider.language == 'Twi' ? 'Hyehyɛɛ' : 'Schedule', const ScheduleScreen(), false),
-                    _drawerTile(context, Icons.insights_rounded, provider.language == 'Twi' ? 'Akontaabuo' : 'Analytics', const AnalyticsScreen(), false),
-                    _drawerTile(context, Icons.history_edu_rounded, provider.language == 'Twi' ? 'Abakɔsɛm' : 'History', const HistoryScreen(), false),
+                    _drawerTile(context, Icons.dashboard_rounded, provider.tr('Home'), null, true),
+                    _drawerTile(context, Icons.cloud_rounded, provider.tr('Weather'), const WeatherScreen(), false),
+                    _drawerTile(context, Icons.event_note_rounded, provider.tr('Schedule'), const ScheduleScreen(), false),
+                    _drawerTile(context, Icons.insights_rounded, provider.tr('Analytics'), const AnalyticsScreen(), false),
+                    _drawerTile(context, Icons.history_edu_rounded, provider.tr('History'), const HistoryScreen(), false),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                       child: Divider(color: Colors.white10),
                     ),
-                    _drawerTile(context, Icons.settings_suggest_rounded, provider.language == 'Twi' ? 'Nhyehyɛe' : 'Settings', const SettingsScreen(), false),
-                    _drawerTile(context, Icons.contact_support_rounded, provider.language == 'Twi' ? 'Fa fa ho' : 'Help & About', const AboutScreen(), false),
+                    _drawerTile(context, Icons.settings_suggest_rounded, provider.tr('Settings'), const SettingsScreen(), false),
+                    _drawerTile(context, Icons.contact_support_rounded, provider.tr('Help & About'), const AboutScreen(), false),
                   ],
                 ),
               ),
@@ -548,7 +553,7 @@ class HomeScreen extends StatelessWidget {
                       const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 20),
                       const SizedBox(width: 12),
                       Text(
-                        provider.language == 'Twi' ? 'Firi mu' : 'Logout', 
+                        provider.tr('Logout'), 
                         style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
                       ),
                     ],
@@ -616,18 +621,6 @@ class _LeafSlideshowState extends State<LeafSlideshow> {
     'assets/images/c9.jpg',
   ];
 
-  final List<String> _tips = [
-    'Regular scanning helps in early disease detection.',
-    'Early diagnosis can increase crop yield by up to 40%.',
-    'Frequent field scouting prevents major disease outbreaks.',
-    'Early detection means easier and cheaper treatment.',
-    'Keep your cabbage healthy with weekly scans.',
-    'Prompt action on first symptoms saves your harvest.',
-    'Proactive monitoring is key to high quality produce.',
-    'Detecting Black Rot early prevents total field loss.',
-    'A healthy field starts with regular AI leaf checks.',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -657,6 +650,30 @@ class _LeafSlideshowState extends State<LeafSlideshow> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final provider = Provider.of<AppProvider>(context);
+
+    final List<String> tips = provider.language == 'Twi' ? [
+      'Bere nyinaa scan nhaban no sɛnea ɛbɛyɛ a wobɛhu yadeɛ ntɛm.',
+      'Yadeɛ ho nhwehwɛmu ntɛm tumi ma nnɔbae pii si so bɛyɛ 40%.',
+      'Bere nyinaa kɔ afuo mu hwɛ nnɔbae no sɛnea ɛbɛyɛ a yadeɛ biara remma.',
+      'Sɛ wohu yadeɛ ntɛm a, ayaresa nso yɛ mmerɛ na ne bo nso yɛ fo.',
+      'Scan wo kabeji dabiara dabiara sɛnea ɛbɛyɛ a ɛho bɛyɛ den.',
+      'Sɛ wohu sɛ yadeɛ bi reba a, yɛ ho adwuma ntɛm na woantumi anhwere wo nnɔbae.',
+      'Nhwehwɛmu a ɛkɔ so bere nyinaa ma wonya nnɔbae pa.',
+      'Black Rot ho nhwehwɛmu ntɛm si kwan ma woantumi anhwere wo nnɔbae nyinaa.',
+      'Afuo pa fiti ase firi AI nhwehwɛmu a wɔyɛ dabiara dabiara.',
+    ] : [
+      'Regular scanning helps in early disease detection.',
+      'Early diagnosis can increase crop yield by up to 40%.',
+      'Frequent field scouting prevents major disease outbreaks.',
+      'Early detection means easier and cheaper treatment.',
+      'Keep your cabbage healthy with weekly scans.',
+      'Prompt action on first symptoms saves your harvest.',
+      'Proactive monitoring is key to high quality produce.',
+      'Detecting Black Rot early prevents total field loss.',
+      'A healthy field starts with regular AI leaf checks.',
+    ];
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: SizedBox(
@@ -700,14 +717,14 @@ class _LeafSlideshowState extends State<LeafSlideshow> {
                       color: theme.colorScheme.primary,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.auto_awesome, color: Colors.white, size: 12),
-                        SizedBox(width: 4),
+                        const Icon(Icons.auto_awesome, color: Colors.white, size: 12),
+                        const SizedBox(width: 4),
                         Text(
-                          'CROP CARE TIP',
-                          style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
+                          provider.tr('CROP CARE TIP'),
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
                         ),
                       ],
                     ),
@@ -729,7 +746,7 @@ class _LeafSlideshowState extends State<LeafSlideshow> {
                       );
                     },
                     child: Text(
-                      _tips[_currentPage % _tips.length],
+                      tips[_currentPage % tips.length],
                       key: ValueKey<int>(_currentPage),
                       style: const TextStyle(
                         color: Colors.white,

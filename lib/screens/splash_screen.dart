@@ -12,7 +12,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Navigate to Onboarding after 3 seconds
+    // Navigate to Onboarding after 4 seconds
     Future.delayed(const Duration(seconds: 4), () {
       if (mounted) {
         Navigator.pushReplacement(
@@ -43,25 +43,8 @@ class _SplashScreenState extends State<SplashScreen> {
                 colors: [
                   Colors.black.withOpacity(0.4),
                   Colors.black.withOpacity(0.7),
+                  Colors.black.withOpacity(0.9),
                 ],
-              ),
-            ),
-          ),
-          
-          // Header Footer (Moved to top)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 20,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                'Empowering Ghanaian Farmers'.toUpperCase(),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 3,
-                ),
               ),
             ),
           ),
@@ -115,20 +98,36 @@ class _SplashScreenState extends State<SplashScreen> {
             ],
           ),
           
-          // Bottom Indicator
+          // Bottom Footer (Moved from top to down)
           Positioned(
-            bottom: 40,
+            bottom: 60,
             left: 0,
             right: 0,
-            child: Center(
-              child: Text(
-                'v1.0.0',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+            child: Column(
+              children: [
+                Center(
+                  child: Text(
+                    'Empowering Ghanaian Farmers'.toUpperCase(),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 3,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 12),
+                Center(
+                  child: Text(
+                    'v1.0.0',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

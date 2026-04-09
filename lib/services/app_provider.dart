@@ -66,6 +66,11 @@ class AppProvider with ChangeNotifier {
   }
 
   Future<void> speak(String text) async {
+    if (_language == 'Twi') {
+      await _flutterTts.setLanguage("ak-GH");
+    } else {
+      await _flutterTts.setLanguage("en-US");
+    }
     await _flutterTts.speak(text);
   }
 
@@ -136,10 +141,10 @@ class AppProvider with ChangeNotifier {
   String getSuggestedActivity(DateTime day) {
     if (_history.isNotEmpty) {
       String latestDisease = _history.first.diseaseName;
-      if (latestDisease == 'Black Rot' && (day.weekday == DateTime.tuesday || day.weekday == DateTime.friday)) {
+      if (latestDisease.contains('Black Rot') && (day.weekday == DateTime.tuesday || day.weekday == DateTime.friday)) {
         return _language == 'Twi' ? 'Wuo Aduane ma Black Rot' : 'Copper Fungicide Spray';
       }
-      if (latestDisease == 'Downy Mildew' && day.weekday == DateTime.monday) {
+      if (latestDisease.contains('Downy Mildew') && day.weekday == DateTime.monday) {
         return _language == 'Twi' ? 'Hwɛ nhaban no ase' : 'Check Leaf Undersides';
       }
     }
@@ -187,11 +192,65 @@ class AppProvider with ChangeNotifier {
     },
   };
 
+  String tr(String key) {
+    if (_language != 'Twi') return key;
+    
+    final twiMap = {
+      'DASHBOARD': 'ADWUMAYƐBEA',
+      'Scan your leaves for health status.': 'Hwɛ wo nnɔbae ahoɔden.',
+      'Sunny': 'Wiem Ayɛ Hyɛ',
+      'Scans': 'Nhwehwɛmu',
+      'Diagnosis Tools': 'Nhwehwɛmu Akwan',
+      'Camera': 'Kamera',
+      'Gallery': 'Adaka',
+      'Recent Scans': 'Nhwehwɛmu a Atwam',
+      'View all': 'Hwɛ ne nyinaa',
+      'LIVE': 'ƐREKƆ SO',
+      'Daily Recommendation': 'Afutuo',
+      'Plan More': 'Hyehyɛ foforɔ',
+      'Based on crop cycle': 'Ɛgyina nnɔbae mmerɛ so',
+      'CROP CARE TIP': 'AFUTUO PA',
+      'Home': 'Efie',
+      'Farm Weather': 'Wiem mberɛ',
+      'Weather': 'Wiem mberɛ',
+      'Scan Schedule': 'Hyehyɛɛ',
+      'Schedule': 'Hyehyɛɛ',
+      'Field Analytics': 'Akontaabuo',
+      'Analytics': 'Akontaabuo',
+      'Scan History': 'Abakɔsɛm',
+      'History': 'Abakɔsɛm',
+      'Settings': 'Nhyehyɛe',
+      'About Doctor': 'Fa fa ho',
+      'Help & About': 'Mmoa ne Ho Asɛm',
+      'Logout': 'Firi mu',
+      'Standard Access': 'Mmoa Baako',
+      'Pro Farmer': 'Okuafoɔ Panin',
+      'Guest User': 'Ɔhɔhoɔ',
+      'DIAGNOSIS': 'NHWEHWƐMU',
+      'Description': 'Nkyerɛmu',
+      'Recommended Treatment': 'Sɛnea yɛsa yadeɛ no',
+      'Back to Dashboard': 'Kɔ Fie',
+      'Listen to Advice': 'Tie afutuo no',
+      'Stop Listening': 'Gyae tie',
+      'Tie afutuo no wɔ Twi mu': 'Tie afutuo no',
+      'ANALYZING LEAF...': 'YƐREHWƐ NHABAN NO...',
+      'Our AI is detecting diseases': 'Yɛrehwɛ sɛ yadeɛ biara wɔ ho',
+      'No history yet.\nStart by scanning a leaf!': 'Abakɔsɛm biara nni hɔ.\nFa scan nhaban bi fiti ase!',
+      'Detection History': 'Nhwehwɛmu Abakɔsɛm',
+      'Delete Scan?': 'Popa Nhwehwɛmu no?',
+      'This action cannot be undone.': 'Sɛ wopopa a, ɛrentumi nsan mma bio.',
+      'CANCEL': 'TWƐN',
+      'DELETE': 'POPA',
+      'Scan deleted': 'Yɛapopa nhwehwɛmu no',
+    };
+
+    return twiMap[key] ?? key;
+  }
+
   Future<void> pickImage(ImageSource source) async {
     final XFile? pickedFile = await _picker.pickImage(source: source);
     
     if (pickedFile != null) {
-      // Save image to permanent storage
       final directory = await getApplicationDocumentsDirectory();
       final fileName = path.basename(pickedFile.path);
       final savedImage = await File(pickedFile.path).copy('${directory.path}/$fileName');

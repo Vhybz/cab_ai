@@ -16,30 +16,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<OnboardingData> _pages = [
-    OnboardingData(
-      title: 'Precision AI\nDetection',
-      subtitle: 'Identify Diseases Instantly',
-      description: 'Our advanced neural networks detect cabbage diseases with over 95% accuracy in seconds.',
-      imagePath: 'assets/images/c2.jpg',
-      color: const Color(0xFF4CAF50),
-    ),
-    OnboardingData(
-      title: 'Expert Field\nAdvice',
-      subtitle: 'Smart Farming Assistant',
-      description: 'Receive localized treatment plans and preventive measures tailored for your farm.',
-      imagePath: 'assets/images/c3.jpg',
-      color: const Color(0xFFFF9800),
-    ),
-    OnboardingData(
-      title: 'Reliable Offline\nAnalysis',
-      subtitle: 'No Internet Needed',
-      description: 'Scan your crops anywhere, even in the most remote fields. All AI models run on your device.',
-      imagePath: 'assets/images/c4.jpg',
-      color: const Color(0xFF2196F3),
-    ),
-  ];
-
   void _onQuickScan() {
     Provider.of<AppProvider>(context, listen: false).setGuestUser();
     Navigator.pushReplacement(
@@ -50,25 +26,56 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = Provider.of<AppProvider>(context);
+    final isTwi = provider.language == 'Twi';
+
+    final List<OnboardingData> pages = [
+      OnboardingData(
+        title: isTwi ? 'AI Nhwehwɛmu\na Ɛdi Mu' : 'Precision AI\nDetection',
+        subtitle: isTwi ? 'Hu Yadeɛ No Ntɛm' : 'Identify Diseases Instantly',
+        description: isTwi 
+            ? 'Yɛn AI mmoawa nhwehwɛmu adwuma yi hu kabeji yadeɛ nyinaa bɛyɛ 95% wɔ sikani kakra bi mu.' 
+            : 'Our advanced neural networks detect cabbage diseases with over 95% accuracy in seconds.',
+        imagePath: 'assets/images/c2.jpg',
+        color: const Color(0xFF4CAF50),
+      ),
+      OnboardingData(
+        title: isTwi ? 'Afutuo Pa firi\nAnigyeɛ Mu' : 'Expert Field\nAdvice',
+        subtitle: isTwi ? 'Akuafoɔ Mmoa' : 'Smart Farming Assistant',
+        description: isTwi 
+            ? 'Nya ayaresa ne akwan a wobɛfa so asiw yadeɛ kwan wɔ w’afuo mu.' 
+            : 'Receive localized treatment plans and preventive measures tailored for your farm.',
+        imagePath: 'assets/images/c3.jpg',
+        color: const Color(0xFFFF9800),
+      ),
+      OnboardingData(
+        title: isTwi ? 'Nhwehwɛmu a\nIntanɛt Nni Ho' : 'Reliable Offline\nAnalysis',
+        subtitle: isTwi ? 'Intanɛt Hia' : 'No Internet Needed',
+        description: isTwi 
+            ? 'Scan wo nnɔbae no wɔ baabiara, mpo mmeae a intanɛt nni hɔ koraa.' 
+            : 'Scan your crops anywhere, even in the most remote fields. All AI models run on your device.',
+        imagePath: 'assets/images/c4.jpg',
+        color: const Color(0xFF2196F3),
+      ),
+    ];
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Cinematic Background with Smooth Transitions
           PageView.builder(
             controller: _pageController,
-            itemCount: _pages.length,
+            itemCount: pages.length,
             onPageChanged: (int page) => setState(() => _currentPage = page),
-            physics: const BouncingScrollPhysics(), // Allows swiping both ways
+            physics: const BouncingScrollPhysics(),
             itemBuilder: (context, index) {
               return Stack(
                 fit: StackFit.expand,
                 children: [
                   Image.asset(
-                    _pages[index].imagePath,
+                    pages[index].imagePath,
                     fit: BoxFit.cover,
                   ),
-                  // Strong dark gradient to ensure text visibility over green images
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -88,8 +95,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               );
             },
           ),
-
-          // 2. Fixed Content Layer
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32.0),
@@ -100,7 +105,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Back button to allow manual navigation back
                       _currentPage > 0 
                         ? IconButton(
                             onPressed: () => _pageController.previousPage(
@@ -122,16 +126,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           backgroundColor: Colors.white.withOpacity(0.1),
                           shape: const StadiumBorder(),
                         ),
-                        child: const Text(
-                          'Skip',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        child: Text(
+                          isTwi ? 'Twa mu' : 'Skip',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                       ),
                     ],
                   ),
                   const Spacer(),
-                  
-                  // Text Content with Animation
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 500),
                     transitionBuilder: (Widget child, Animation<double> animation) {
@@ -153,14 +155,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: _pages[_currentPage].color.withOpacity(0.25),
+                            color: pages[_currentPage].color.withOpacity(0.25),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: _pages[_currentPage].color.withOpacity(0.5)),
+                            border: Border.all(color: pages[_currentPage].color.withOpacity(0.5)),
                           ),
                           child: Text(
-                            _pages[_currentPage].subtitle.toUpperCase(),
+                            pages[_currentPage].subtitle.toUpperCase(),
                             style: TextStyle(
-                              color: _pages[_currentPage].color,
+                              color: pages[_currentPage].color,
                               fontWeight: FontWeight.w900,
                               fontSize: 10,
                               letterSpacing: 2,
@@ -169,7 +171,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          _pages[_currentPage].title,
+                          pages[_currentPage].title,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 44,
@@ -183,9 +185,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          _pages[_currentPage].description,
+                          pages[_currentPage].description,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.95), // Highly visible
+                            color: Colors.white.withOpacity(0.95),
                             fontSize: 16,
                             height: 1.6,
                             shadows: const [
@@ -196,17 +198,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ],
                     ),
                   ),
-                  
                   const SizedBox(height: 48),
-                  
-                  // Bottom Navigation Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Indicators (Clickable)
                       Row(
                         children: List.generate(
-                          _pages.length,
+                          pages.length,
                           (index) => GestureDetector(
                             onTap: () => _pageController.animateToPage(
                               index,
@@ -226,11 +224,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ),
                         ),
                       ),
-                      
-                      // Progress FAB Button
                       GestureDetector(
                         onTap: () {
-                          if (_currentPage == _pages.length - 1) {
+                          if (_currentPage == pages.length - 1) {
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -247,18 +243,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           height: 72,
                           width: 72,
                           decoration: BoxDecoration(
-                            color: _pages[_currentPage].color,
+                            color: pages[_currentPage].color,
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: _pages[_currentPage].color.withOpacity(0.4),
+                                color: pages[_currentPage].color.withOpacity(0.4),
                                 blurRadius: 20,
                                 offset: const Offset(0, 10),
                               ),
                             ],
                           ),
                           child: Icon(
-                            _currentPage == _pages.length - 1 ? Icons.done_rounded : Icons.chevron_right_rounded,
+                            _currentPage == pages.length - 1 ? Icons.done_rounded : Icons.chevron_right_rounded,
                             color: Colors.white,
                             size: 32,
                           ),
@@ -266,10 +262,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ],
                   ),
-                  
                   const SizedBox(height: 32),
-                  
-                  // Quick Scan Link
                   Center(
                     child: TextButton(
                       onPressed: _onQuickScan,
@@ -278,12 +271,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           style: const TextStyle(fontSize: 13),
                           children: [
                             TextSpan(
-                              text: 'New here? ',
+                              text: isTwi ? 'Woyɛ foforɔ? ' : 'New here? ',
                               style: TextStyle(color: Colors.white.withOpacity(0.7)),
                             ),
-                            const TextSpan(
-                              text: 'Try Quick Scan',
-                              style: TextStyle(
+                            TextSpan(
+                              text: isTwi ? 'Yɛ Nhwehwɛmu Ntɛm' : 'Try Quick Scan',
+                              style: const TextStyle(
                                 color: Colors.white, 
                                 fontWeight: FontWeight.bold,
                                 decoration: TextDecoration.underline,

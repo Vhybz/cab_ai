@@ -16,7 +16,7 @@ class HistoryScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detection History'),
+        title: Text(provider.tr('Detection History')),
         elevation: 0,
         backgroundColor: Colors.transparent,
         foregroundColor: isDark ? Colors.white : Colors.black,
@@ -29,10 +29,10 @@ class HistoryScreen extends StatelessWidget {
                 children: [
                   Icon(Icons.history_rounded, size: 80, color: Colors.grey.withOpacity(0.5)),
                   const SizedBox(height: 16),
-                  const Text(
-                    'No history yet.\nStart by scanning a leaf!',
+                  Text(
+                    provider.tr('No history yet.\nStart by scanning a leaf!'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                    style: const TextStyle(fontSize: 18, color: Colors.grey),
                   ),
                 ],
               ),
@@ -55,17 +55,17 @@ class HistoryScreen extends StatelessWidget {
                     return await showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: const Text('Delete Scan?'),
-                        content: const Text('This action cannot be undone.'),
+                        title: Text(provider.tr('Delete Scan?')),
+                        content: Text(provider.tr('This action cannot be undone.')),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context, false),
-                            child: const Text('CANCEL'),
+                            child: Text(provider.tr('CANCEL')),
                           ),
                           TextButton(
                             onPressed: () => Navigator.pop(context, true),
                             style: TextButton.styleFrom(foregroundColor: Colors.red),
-                            child: const Text('DELETE'),
+                            child: Text(provider.tr('DELETE')),
                           ),
                         ],
                       ),
@@ -74,7 +74,7 @@ class HistoryScreen extends StatelessWidget {
                   onDismissed: (direction) {
                     provider.deleteScan(item);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Scan deleted')),
+                      SnackBar(content: Text(provider.tr('Scan deleted'))),
                     );
                   },
                   child: Card(

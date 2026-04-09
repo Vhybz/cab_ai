@@ -48,9 +48,10 @@ class _ResultScreenState extends State<ResultScreen> {
     }
   }
 
-  void _shareReport(String disease, String treatment) {
-    Share.share(
-      'ca_ai Health Report\n\nDisease: $disease\n\nRecommended Treatment: $treatment\n\nDownload ca_ai to protect your crops!',
+  void _shareReport(String disease, String treatment, String imagePath) {
+    Share.shareXFiles(
+      [XFile(imagePath)],
+      text: 'ca_ai Health Report\n\nDisease: $disease\n\nRecommended Treatment: $treatment\n\nDownload ca_ai to protect your crops!',
       subject: 'Cabbage Health Report',
     );
   }
@@ -92,7 +93,7 @@ class _ResultScreenState extends State<ResultScreen> {
             actions: [
               IconButton(
                 icon: const Icon(Icons.share_rounded, color: Colors.white),
-                onPressed: () => _shareReport(prediction.diseaseName, prediction.treatment),
+                onPressed: () => _shareReport(prediction.diseaseName, prediction.treatment, prediction.imagePath),
               ),
             ],
           ),
