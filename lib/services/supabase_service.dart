@@ -226,29 +226,33 @@ class SupabaseService {
 
   Future<String> askGemini(String prompt) async {
     try {
-      final session = _client.auth.currentSession;
-      
       final response = await _client.functions.invoke(
-        'hello-world',
-        body: {'prompt': prompt},
+        'cabbage-doctor',
+        body: {
+          'prompt': prompt,
+          'content': prompt,
+          'message': prompt,
+        },
       );
       
       if (response.status == 200) {
         if (response.data is Map) {
-          return response.data['reply'] ?? 
-                 response.data['message'] ?? 
-                 response.data['text'] ?? 
-                 response.data.toString();
+          final data = response.data as Map;
+          return data['reply']?.toString() ?? 
+                 data['message']?.toString() ?? 
+                 data['text']?.toString() ?? 
+                 data['content']?.toString() ??
+                 data.toString();
         }
         return response.data.toString();
       } else {
+        if (response.data is Map && response.data['error'] != null) {
+          return 'AI Error: ${response.data['error']}';
+        }
         return 'Error ${response.status}: ${response.data}';
       }
     } on FunctionException catch (e) {
-      if (e.status == 401) {
-        return 'Unauthorized: Your login session might have expired. Please try logging out and back in.';
-      }
-      return 'AI Error: ${e.status}';
+      return 'Function Error: ${e.status} - ${e.details}';
     } catch (e) {
       return 'AI unreachable: $e';
     }

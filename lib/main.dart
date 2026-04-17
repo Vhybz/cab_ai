@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'services/app_provider.dart';
 import 'screens/splash_screen.dart';
 import 'services/notification_service.dart';
@@ -9,6 +10,13 @@ import 'services/notification_service.dart';
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables from cab.env
+  try {
+    await dotenv.load(fileName: "cab.env");
+  } catch (e) {
+    debugPrint('Warning: Could not load cab.env file: $e');
+  }
   
   // Initialize Supabase with your credentials
   await Supabase.initialize(
