@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'services/app_provider.dart';
 import 'screens/splash_screen.dart';
+import 'screens/reset_password_screen.dart';
 import 'services/notification_service.dart';
 
 void main() async {
@@ -43,14 +44,39 @@ void main() async {
   );
 }
 
-class CabbageDoctorApp extends StatelessWidget {
+class CabbageDoctorApp extends StatefulWidget {
   const CabbageDoctorApp({super.key});
+
+  @override
+  State<CabbageDoctorApp> createState() => _CabbageDoctorAppState();
+}
+
+class _CabbageDoctorAppState extends State<CabbageDoctorApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final AuthChangeEvent event = data.event;
+      if (event == AuthChangeEvent.passwordRecovery) {
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (context) => const ResetPasswordScreen()),
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AppProvider>(
       builder: (context, provider, child) {
         return MaterialApp(
+          navigatorKey: _navigatorKey,
           title: 'Cabbage Doctor',
           debugShowCheckedModeBanner: false,
           themeMode: provider.themeMode,

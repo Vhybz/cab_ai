@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/app_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -141,18 +142,20 @@ class SettingsScreen extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('Help & Support'),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.email_outlined),
-              title: Text('Email Us'),
-              subtitle: Text('support@cabbagedoctor.uenr.edu.gh'),
+              leading: const Icon(Icons.email_outlined),
+              title: const Text('Email Us'),
+              subtitle: const Text('project0z1258@gmail.com'),
+              onTap: () => _launchEmail(),
             ),
             ListTile(
-              leading: Icon(Icons.language),
-              title: Text('Visit Website'),
-              subtitle: Text('www.cabbagedoctor.gh'),
+              leading: const Icon(Icons.message_outlined),
+              title: const Text('WhatsApp Support'),
+              subtitle: const Text('0559650921'),
+              onTap: () => _launchWhatsApp(),
             ),
           ],
         ),
@@ -161,5 +164,28 @@ class SettingsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _launchEmail() async {
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      path: 'project0z1258@gmail.com',
+      queryParameters: {'subject': 'Support Request - Cabbage Doctor App'},
+    );
+    try {
+      await launchUrl(emailLaunchUri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('Error launching email: \$e');
+    }
+  }
+
+  void _launchWhatsApp() async {
+    // Standard WhatsApp URL format
+    final Uri whatsappUri = Uri.parse("https://wa.me/233559650921?text=Hello%20Support,%20I%20need%20help%20with%20the%20Cabbage%20Doctor%20app.");
+    try {
+      await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('Error launching WhatsApp: \$e');
+    }
   }
 }

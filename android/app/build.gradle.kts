@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -30,9 +31,6 @@ android {
 
     buildTypes {
         getByName("release") {
-            // In some versions of the Flutter Gradle plugin / AGP, 
-            // the property name might be different. 
-            // Standard AGP is isMinifyEnabled, but let's stick to the basic generated structure if unsure.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -44,4 +42,5 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 }

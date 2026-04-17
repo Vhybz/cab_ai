@@ -268,6 +268,14 @@ class AppProvider with ChangeNotifier {
       'twi_treatment': 'Ma mframa mbɔ mu yiye, mma nsuo nka nhaban no so pii, na fa nnuru a ɛfata gu so.',
       'image': 'assets/images/c3.jpg'
     },
+    'White Rust': {
+      'description': 'A disease caused by Albugo candida, appearing as white, chalky pustules on the undersides of leaves.',
+      'treatment': 'Remove infected leaves, improve drainage, and use resistant varieties or fungicides.',
+      'twi_name': 'White Rust Yadeɛ',
+      'twi_description': 'Yadeɛ yi ma nhaban no ase yɛ mfutuo fitaa te sɛ nkanyan.',
+      'twi_treatment': 'Tu nhaban a ayɛ yadeɛ no gu, hwɛ ma nsuo nkɔ mu yiye, na fa nnuru a ɛfata gu so.',
+      'image': 'assets/images/c4.jpg'
+    },
     'Healthy': {
       'description': 'The cabbage leaf appears healthy with no visible signs of disease.',
       'treatment': 'Continue regular monitoring and maintain good agricultural practices.',
@@ -334,12 +342,17 @@ class AppProvider with ChangeNotifier {
               isLeaf: true,
             );
             
+            // Add to local history immediately
+            _history.insert(0, _currentPrediction!);
+            _saveHistory();
+            
+            // Sync with Supabase if logged in
             if (!isGuest) {
-              _history.insert(0, _currentPrediction!);
-              _saveHistory();
               await _supabaseService.saveScan(_currentPrediction!, savedImage);
-              _checkAndNotifyAnalytics();
+              // Refresh history from cloud to get the real network path/id if needed
+              await syncWithCloud();
             }
+            _checkAndNotifyAnalytics();
           }
         }
       } catch (e) {
@@ -455,21 +468,27 @@ class AppProvider with ChangeNotifier {
   }
 
   Future<void> deleteScan(Prediction prediction) async {
+    // 1. Remove from local list
     _history.removeWhere((item) => item.dateTime == prediction.dateTime && item.imagePath == prediction.imagePath);
     
-    if (!isGuest && prediction.isNetwork) {
+    // 2. Delete from Supabase Database and Storage
+    if (!isGuest && (prediction.isNetwork || prediction.imagePath.startsWith('http'))) {
       await _supabaseService.deleteScan(prediction.imagePath);
     }
 
+    // 3. Delete local file from device storage
     if (!prediction.isAsset) {
       try {
         final file = File(prediction.imagePath);
-        if (file.existsSync()) file.deleteSync();
+        if (file.existsSync()) {
+          file.deleteSync();
+        }
       } catch (e) {
-        debugPrint('Error deleting file: $e');
+        debugPrint('Error deleting local file: $e');
       }
     }
     
+    // 4. Update local Hive box
     _saveHistory();
     notifyListeners();
   }
@@ -550,6 +569,7 @@ class AppProvider with ChangeNotifier {
       'LIVE': 'ƐREKƆ SO',
       'Daily Recommendation': 'Afutuo',
       'Based on crop cycle': 'Ɛgyina nnɔbae mmerɛ so',
+      'CROP CARE TIP': 'AFUTUO PA',
       'Home': 'Efie',
       'Farm Weather': 'Wiem mberɛ',
       'Weather': 'Wiem mberɛ',
@@ -568,7 +588,7 @@ class AppProvider with ChangeNotifier {
       'Guest User': 'Ɔhɔhoɔ',
       'DIAGNOSIS': 'NHWEHWƐMU',
       'Description': 'Nkyerɛmu',
-      'Recommended Treatment': 'Sɛnea yɛsa yadeɛ no',
+      'Recommended Treatment': 'SƐnea yƐsa yadeƐ no',
       'Back to Dashboard': 'Kɔ Fie',
       'Listen to Advice': 'Tie afutuo no',
       'Stop Listening': 'Gyae tie',
@@ -582,6 +602,13 @@ class AppProvider with ChangeNotifier {
       'CANCEL': 'TWƐN',
       'DELETE': 'POPA',
       'Scan deleted': 'Yɛapopa nhwehwɛmu no',
+      'Upcoming Schedule': 'Hyehyɛɛ a ɛreba',
+      'No tasks scheduled.': 'Hyehyɛɛ biara nni hɔ.',
+      'Scanning': 'NhwehwƐmu',
+      'Watering': 'Nsuo gu',
+      'Pruning': 'Nhyehyɛɛ',
+      'Fertilizing': 'Duane gu',
+      'Pest Control': 'Mmoawa kum',
       'Invalid Image': 'Mfonini no nyɛ papa',
       'Please scan a valid cabbage leaf. Our AI only recognizes cabbage leaves for now.': 'Yɛpa wo kyɛw scan kabeji nhaban a ɛfata. Yɛn AI no hu kabeji nhaban nko ara mprempren.',
       'Delete Selected?': 'Popa deɛ woapaw no?',
@@ -620,7 +647,7 @@ class AppProvider with ChangeNotifier {
       'Next Task': 'Adwuma a ɛdi hɔ',
       'ACTIVE': 'ƐKƆ SO',
       'CABBAGE DOCTOR': 'KABEJI DOCTOR',
-      'How to use': 'Sɛnea wɔde di dwuma',
+      'How to use': 'SƐnea wɔde di dwuma',
       'HOW TO DO IT': 'SƐNEA WƆYƐ NO',
       'Time': 'Mberɛ',
       'Add to Field Schedule': 'Fa ka nhyehyɛe ho',

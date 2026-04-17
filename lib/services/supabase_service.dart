@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/prediction_model.dart';
 import '../models/schedule_model.dart';
 
@@ -47,8 +48,48 @@ class SupabaseService {
     return await _client.auth.signInWithPassword(email: email, password: password);
   }
 
+  Future<AuthResponse> signInWithGoogle() async {
+    // For Web Application credentials in Google Cloud
+    // This ID is used as the 'audience' for the ID Token verification
+    const webClientId = '303496929969-l0uom78g74j9s2it6v0v6onp5m9g3v5v.apps.googleusercontent.com';
+
+    final GoogleSignIn googleSignIn = GoogleSignIn(
+      serverClientId: webClientId,
+    );
+    
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) throw 'Google Sign-In canceled by user.';
+    
+    final googleAuth = await googleUser.authentication;
+    final idToken = googleAuth.idToken;
+    final accessToken = googleAuth.accessToken;
+
+    if (idToken == null) {
+      throw 'No ID Token found.';
+    }
+
+    return _client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: accessToken,
+    );
+  }
+
   Future<void> signOut() async {
     await _client.auth.signOut();
+    await GoogleSignIn().signOut();
+  }
+
+  Future<void> resetPassword(String email) async {
+    try {
+      await _client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'io.supabase.cabageai://reset-password/',
+      );
+    } catch (e) {
+      print('Reset Password Error: $e');
+      rethrow;
+    }
   }
 
   Future<void> saveScan(Prediction scan, File imageFile) async {
