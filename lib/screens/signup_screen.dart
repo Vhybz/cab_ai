@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../services/app_provider.dart';
@@ -41,7 +42,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     'Other'
   ];
 
-  // Map is now a regular variable so we can add detected locations to it dynamically
   late Map<String, List<double>> _regions;
 
   @override
@@ -187,19 +187,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             Row(
                               children: [
                                 Expanded(
-                                  child: _buildTextField(
+                                  child: TextFormField(
                                     controller: _firstNameController,
-                                    label: 'First Name',
-                                    icon: Icons.person_outline_rounded,
+                                    style: const TextStyle(color: Colors.white),
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                                    ],
+                                    decoration: _inputDecoration('First Name', Icons.person_outline_rounded),
                                     validator: (v) => v!.isEmpty ? 'Required' : null,
                                   ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
-                                  child: _buildTextField(
+                                  child: TextFormField(
                                     controller: _surnameController,
-                                    label: 'Surname',
-                                    icon: Icons.badge_outlined,
+                                    style: const TextStyle(color: Colors.white),
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                                    ],
+                                    decoration: _inputDecoration('Surname', Icons.badge_outlined),
                                     validator: (v) => v!.isEmpty ? 'Required' : null,
                                   ),
                                 ),
@@ -236,7 +242,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               validator: (v) => v == null ? 'Required' : null,
                             ),
                             const SizedBox(height: 16),
-                            _buildTextField(controller: _phoneController, label: 'Phone Number', icon: Icons.phone_android_rounded, keyboardType: TextInputType.phone),
+                            TextFormField(
+                              controller: _phoneController,
+                              keyboardType: TextInputType.phone,
+                              style: const TextStyle(color: Colors.white),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(10),
+                              ],
+                              decoration: _inputDecoration('Phone Number', Icons.phone_android_rounded),
+                              validator: (v) {
+                                if (v!.isEmpty) return 'Required';
+                                if (v.length < 10) return 'Must be 10 digits';
+                                return null;
+                              },
+                            ),
                             const SizedBox(height: 16),
                             _buildTextField(
                               controller: _emailController, 
@@ -312,7 +332,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   await provider.useCurrentLocation();
                                   if (mounted) {
                                     final detectedLoc = provider.locationName;
-                                    // CRASH FIX: Ensure the detected location is in the regions map
                                     if (!_regions.containsKey(detectedLoc)) {
                                       _regions[detectedLoc] = [provider.lat, provider.lon];
                                     }

@@ -69,7 +69,8 @@ class AppProvider with ChangeNotifier {
   bool get isChatLoading => _isChatLoading;
 
   String get firstName {
-    if (_userName == 'Guest') return 'Guest';
+    if (_userName == 'Guest' || _userName.isEmpty) return 'Guest';
+    // Handle names like "John Doe" or metadata structured names
     return _userName.split(' ').first;
   }
 
@@ -422,15 +423,12 @@ class AppProvider with ChangeNotifier {
 
   Future<void> _loadUserData() async {
     if (_supabaseService.currentUser != null) {
-      final profile = await Supabase.instance.client
-          .from('profiles')
-          .select()
-          .eq('id', _supabaseService.currentUser!.id)
-          .single();
-      
-      setUserName('${profile['first_name']} ${profile['surname']}');
-      setAvatarUrl(profile['avatar_url']);
-      setLocation(_lat, _lon, profile['region'] ?? 'Unknown');
+      final profile = await _supabaseService.fetchUserProfile();
+      if (profile != null) {
+        setUserName('${profile['first_name']} ${profile['surname']}');
+        setAvatarUrl(profile['avatar_url']);
+        setLocation(_lat, _lon, profile['region'] ?? 'Unknown');
+      }
     }
   }
 

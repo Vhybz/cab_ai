@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 import '../models/prediction_model.dart';
 import '../models/schedule_model.dart';
 
@@ -30,7 +31,7 @@ class SupabaseService {
     );
 
     if (response.user != null) {
-      await _client.from('profiles').insert({
+      await _client.from('profiles').upsert({
         'id': response.user!.id,
         'first_name': firstName,
         'surname': surname,
@@ -49,35 +50,62 @@ class SupabaseService {
   }
 
   Future<AuthResponse> signInWithGoogle() async {
-    // For Web Application credentials in Google Cloud
-    // This ID is used as the 'audience' for the ID Token verification
-    const webClientId = '303496929969-l0uom78g74j9s2it6v0v6onp5m9g3v5v.apps.googleusercontent.com';
+    try {
+      const webClientId = '714676926049-pr7m1k73409d3mifn47gs19c6aft2s0n.apps.googleusercontent.com';
 
-    final GoogleSignIn googleSignIn = GoogleSignIn(
-      serverClientId: webClientId,
-    );
-    
-    final googleUser = await googleSignIn.signIn();
-    if (googleUser == null) throw 'Google Sign-In canceled by user.';
-    
-    final googleAuth = await googleUser.authentication;
-    final idToken = googleAuth.idToken;
-    final accessToken = googleAuth.accessToken;
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: webClientId,
+      );
+      
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        throw 'Google Sign-In was canceled.';
+      }
+      
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
 
-    if (idToken == null) {
-      throw 'No ID Token found.';
+      if (idToken == null) {
+        throw 'Failed to retrieve Google ID Token.';
+      }
+
+      final response = await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      if (response.user != null) {
+        // Automatically extract details from Google Metadata and sync with Profile
+        final metadata = response.user!.userMetadata;
+        final fullName = metadata?['full_name'] ?? googleUser.displayName ?? '';
+        final firstName = fullName.split(' ').first;
+        final surname = fullName.contains(' ') ? fullName.split(' ').sublist(1).join(' ') : '';
+        final avatarUrl = metadata?['avatar_url'] ?? metadata?['picture'] ?? googleUser.photoUrl;
+
+        await _client.from('profiles').upsert({
+          'id': response.user!.id,
+          'first_name': firstName,
+          'surname': surname,
+          'avatar_url': avatarUrl,
+        }, onConflict: 'id');
+      }
+
+      return response;
+    } catch (e) {
+      debugPrint('Google Sign-In Error: $e');
+      rethrow;
     }
-
-    return _client.auth.signInWithIdToken(
-      provider: OAuthProvider.google,
-      idToken: idToken,
-      accessToken: accessToken,
-    );
   }
 
   Future<void> signOut() async {
     await _client.auth.signOut();
-    await GoogleSignIn().signOut();
+    try {
+      await GoogleSignIn().signOut();
+    } catch (e) {
+      debugPrint('Error during Google Sign-Out: $e');
+    }
   }
 
   Future<void> resetPassword(String email) async {

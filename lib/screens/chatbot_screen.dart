@@ -56,111 +56,156 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final isTwi = provider.language == 'Twi';
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isTwi ? 'Kabeji Mmoawa' : 'Cabbage Assistant'),
-        backgroundColor: Colors.green,
+        title: Text(isTwi ? 'Kabeji Mmoawa' : 'Cabbage Assistant', 
+          style: const TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+        backgroundColor: isDark ? theme.colorScheme.surface : Colors.green,
         foregroundColor: Colors.white,
       ),
-      body: Column(
+      body: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF121212) : Colors.grey[50],
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(16),
+                itemCount: _messages.length + (provider.isChatLoading ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == _messages.length) {
+                    return _buildTypingIndicator(isDark);
+                  }
+
+                  final msg = _messages[index];
+                  final isBot = msg['role'] == 'bot';
+                  return _buildMessageBubble(msg['text']!, isBot, isDark, theme);
+                },
+              ),
+            ),
+            _buildInputArea(provider, isTwi, isDark, theme),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageBubble(String text, bool isBot, bool isDark, ThemeData theme) {
+    return Align(
+      alignment: isBot ? Alignment.centerLeft : Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isBot 
+              ? (isDark ? const Color(0xFF2C2C2E) : Colors.white)
+              : (isDark ? theme.colorScheme.primary.withOpacity(0.8) : Colors.green[100]),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(20),
+            topRight: const Radius.circular(20),
+            bottomLeft: Radius.circular(isBot ? 0 : 20),
+            bottomRight: Radius.circular(isBot ? 20 : 0),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: isBot 
+                ? (isDark ? Colors.white.withOpacity(0.9) : Colors.black87)
+                : (isDark ? Colors.white : Colors.black87),
+            fontSize: 15,
+            height: 1.4,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator(bool isDark) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+            bottomLeft: Radius.zero,
+            bottomRight: Radius.circular(20),
+          ),
+        ),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(
+                isDark ? Colors.greenAccent : Colors.green),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputArea(AppProvider provider, bool isTwi, bool isDark, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      decoration: BoxDecoration(
+        color: isDark ? theme.colorScheme.surface : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.5 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
         children: [
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length + (provider.isChatLoading ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length) {
-                  return Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(12).copyWith(
-                          bottomLeft: Radius.zero,
-                        ),
-                      ),
-                      child: const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  );
-                }
-
-                final msg = _messages[index];
-                final isBot = msg['role'] == 'bot';
-                return Align(
-                  alignment: isBot ? Alignment.centerLeft : Alignment.centerRight,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isBot ? Colors.grey[200] : Colors.green[100],
-                      borderRadius: BorderRadius.circular(12).copyWith(
-                        bottomLeft: isBot ? Radius.zero : const Radius.circular(12),
-                        bottomRight: isBot ? const Radius.circular(12) : Radius.zero,
-                      ),
-                    ),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                    child: Text(
-                      msg['text']!,
-                      style: TextStyle(
-                        color: isBot ? Colors.black87 : Colors.black,
-                      ),
-                    ),
-                  ),
-                );
-              },
+            child: TextField(
+              controller: _controller,
+              enabled: !provider.isChatLoading,
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
+                hintText: isTwi ? 'Bisa asɛm bi...' : 'Ask a question...',
+                hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF1C1C1E) : Colors.grey[100],
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              onSubmitted: (_) => _sendMessage(),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(8.0),
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    enabled: !provider.isChatLoading,
-                    decoration: InputDecoration(
-                      hintText: isTwi ? 'Bisa asɛm bi...' : 'Ask a question...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    ),
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: provider.isChatLoading ? null : _sendMessage,
-                  icon: provider.isChatLoading 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Icon(Icons.send),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: provider.isChatLoading ? null : _sendMessage,
+            child: CircleAvatar(
+              radius: 24,
+              backgroundColor: isDark ? Colors.greenAccent : Colors.green,
+              child: provider.isChatLoading 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                  : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
             ),
           ),
         ],

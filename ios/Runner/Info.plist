@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Cabage Ai</string>
+	<string>Cabbage Doctor</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,6 +26,32 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+
+	<!-- Permissions for Cabbage Doctor -->
+	<key>NSCameraUsageDescription</key>
+	<string>Cabbage Doctor needs camera access to scan leaves for diseases.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Cabbage Doctor needs access to your gallery to analyze saved leaf images.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Cabbage Doctor needs your location to provide accurate local weather for your farm.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Cabbage Doctor needs your location to provide accurate local weather for your farm.</string>
+
+	<!-- Deep Linking and Google Sign-In -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>io.supabase.cabageai</string>
+				<!-- Replace the string below with your REVERSED_CLIENT_ID from Google Cloud Console -->
+				<string>com.googleusercontent.apps.303496929969-l0uom78g74j9s2it6v0v6onp5m9g3v5v</string>
+			</array>
+		</dict>
+	</array>
+
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

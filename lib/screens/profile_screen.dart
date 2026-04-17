@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -29,6 +30,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _userEmail;
   bool _isEditing = false;
   bool _isLoading = true;
+  bool _isLocationLoading = false;
 
   final List<String> _professions = [
     'Crop Farmer',
@@ -129,6 +131,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _useCurrentLocation() async {
+    setState(() => _isLocationLoading = true);
+    try {
+      final provider = Provider.of<AppProvider>(context, listen: false);
+      await provider.useCurrentLocation();
+      setState(() {
+        final detected = provider.locationName;
+        _selectedRegion = _regions.firstWhere(
+          (r) => r.toLowerCase().contains(detected.toLowerCase()),
+          orElse: () => _selectedRegion ?? _regions[1]
+        );
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Location updated to: ${provider.locationName}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error getting location: $e')),
+        );
+      }
+    } finally {
+      setState(() => _isLocationLoading = false);
+    }
+  }
+
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
@@ -172,10 +202,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final provider = Provider.of<AppProvider>(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Farmer Profile'),
+        title: const Text('Farmer Profile', style: TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : colorScheme.primary,
+        foregroundColor: Colors.white,
         actions: [
           if (!_isLoading)
             IconButton(
@@ -191,24 +226,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? const Center(child: CircularProgressIndicator())
         : SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  _buildProfileHeader(colorScheme, provider),
-                  const SizedBox(height: 24),
-                  
-                  if (!_isEditing) ...[
-                    _buildViewMode(theme, colorScheme, provider),
-                  ] else ...[
-                    _buildEditMode(),
-                  ],
-                  const SizedBox(height: 40),
-                ],
-              ),
+            child: Column(
+              children: [
+                _buildHeaderBackground(colorScheme, provider, isDark, theme),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20),
+                        if (!_isEditing) ...[
+                          _buildViewMode(theme, colorScheme, provider, isDark),
+                        ] else ...[
+                          _buildEditMode(isDark, theme),
+                        ],
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+    );
+  }
+
+  Widget _buildHeaderBackground(ColorScheme colorScheme, AppProvider provider, bool isDark, ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : colorScheme.primary,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(40),
+          bottomRight: Radius.circular(40),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+      child: Column(
+        children: [
+          _buildProfileHeader(colorScheme, provider),
+          if (!_isEditing) ...[
+            const SizedBox(height: 16),
+            Text(
+              '${_firstNameController.text} ${_surnameController.text}',
+              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _selectedProfession ?? 'Farmer',
+              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -220,105 +291,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onTap: _isEditing ? _pickAvatar : null,
           child: Container(
             padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: colorScheme.primary, width: 2),
+              color: Colors.white24,
             ),
             child: CircleAvatar(
-              radius: 60,
-              backgroundColor: colorScheme.primary.withOpacity(0.1),
+              radius: 65,
+              backgroundColor: Colors.white10,
               backgroundImage: provider.avatarUrl != null ? NetworkImage(provider.avatarUrl!) : null,
               child: provider.avatarUrl == null 
-                ? Icon(Icons.person_rounded, size: 80, color: colorScheme.primary)
+                ? const Icon(Icons.person_rounded, size: 80, color: Colors.white70)
                 : null,
             ),
           ),
         ),
         if (_isEditing)
-          CircleAvatar(
-            backgroundColor: colorScheme.primary,
-            radius: 18,
-            child: const Icon(Icons.camera_alt_rounded, size: 18, color: Colors.white),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle),
+            child: const Icon(Icons.camera_alt_rounded, size: 20, color: Colors.black87),
           ),
       ],
     );
   }
 
-  Widget _buildViewMode(ThemeData theme, ColorScheme colorScheme, AppProvider provider) {
+  Widget _buildViewMode(ThemeData theme, ColorScheme colorScheme, AppProvider provider, bool isDark) {
     return Column(
       children: [
-        Text(
-          '${_firstNameController.text} ${_surnameController.text}',
-          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        Text(
-          _selectedProfession ?? 'Farmer',
-          style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w500),
-        ),
+        _buildInfoCard(isDark, [
+          _buildInfoRow(Icons.email_outlined, 'Email', _userEmail ?? 'Not Set', isDark),
+          _buildDivider(isDark),
+          _buildInfoRow(Icons.wc_rounded, 'Gender', _selectedGender ?? 'Not Set', isDark),
+          _buildDivider(isDark),
+          _buildInfoRow(Icons.phone_rounded, 'Contact', _phoneController.text, isDark),
+          _buildDivider(isDark),
+          _buildInfoRow(Icons.cake_rounded, 'Date of Birth', _dobController.text, isDark),
+          _buildDivider(isDark),
+          _buildInfoRow(Icons.location_on_rounded, 'Region', _selectedRegion ?? 'Not Set', isDark),
+        ]),
         const SizedBox(height: 32),
-        _buildInfoTile(Icons.email_outlined, 'Email', _userEmail ?? 'Not Set'),
-        _buildInfoTile(Icons.wc_rounded, 'Gender', _selectedGender ?? 'Not Set'),
-        _buildInfoTile(Icons.phone_rounded, 'Contact', _phoneController.text),
-        _buildInfoTile(Icons.cake_rounded, 'Date of Birth', _dobController.text),
-        _buildInfoTile(Icons.location_on_rounded, 'Region', _selectedRegion ?? 'Not Set'),
-        const SizedBox(height: 40),
-        OutlinedButton.icon(
+        ElevatedButton.icon(
           onPressed: () {
             provider.signOut();
             Navigator.pop(context);
           },
           icon: const Icon(Icons.logout_rounded),
-          label: const Text('Sign Out'),
-          style: OutlinedButton.styleFrom(
+          label: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.bold)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isDark ? Colors.red.withOpacity(0.2) : Colors.red[50],
             foregroundColor: Colors.redAccent,
-            side: const BorderSide(color: Colors.redAccent),
-            minimumSize: const Size(double.infinity, 50),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEditMode() {
-    return Column(
-      children: [
-        _buildTextField('First Name', _firstNameController, Icons.person_outline),
-        const SizedBox(height: 16),
-        _buildTextField('Surname', _surnameController, Icons.badge_outlined),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _dobController,
-          readOnly: true,
-          onTap: () => _selectDate(context),
-          decoration: _inputDecoration('Date of Birth', Icons.calendar_today_outlined),
-          validator: (v) => v!.isEmpty ? 'Required' : null,
-        ),
-        const SizedBox(height: 16),
-        _buildTextField('Phone Number', _phoneController, Icons.phone_android_rounded, TextInputType.phone),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _selectedProfession,
-          isExpanded: true,
-          decoration: _inputDecoration('Profession', Icons.work_outline),
-          items: _professions.map((p) => DropdownMenuItem(value: p, child: Text(p, overflow: TextOverflow.ellipsis))).toList(),
-          onChanged: (v) => setState(() => _selectedProfession = v),
-          validator: (v) => v == null ? 'Required' : null,
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _selectedRegion,
-          isExpanded: true,
-          decoration: _inputDecoration('Region', Icons.map_outlined),
-          items: _regions.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))).toList(),
-          onChanged: (v) => setState(() => _selectedRegion = v),
-          validator: (v) => v == null ? 'Required' : null,
-        ),
-        const SizedBox(height: 40),
-        FilledButton.icon(
-          onPressed: _saveProfile,
-          icon: const Icon(Icons.save_rounded),
-          label: const Text('Save Changes'),
-          style: FilledButton.styleFrom(
+            elevation: 0,
             minimumSize: const Size(double.infinity, 56),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
@@ -327,29 +349,171 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoTile(IconData icon, String label, String value) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.grey),
-      title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      subtitle: Text(value.isEmpty ? 'Not Set' : value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+  Widget _buildEditMode(bool isDark, ThemeData theme) {
+    return Column(
+      children: [
+        _buildTextField('First Name', _firstNameController, Icons.person_outline, isDark),
+        const SizedBox(height: 16),
+        _buildTextField('Surname', _surnameController, Icons.badge_outlined, isDark),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _dobController,
+          readOnly: true,
+          onTap: () => _selectDate(context),
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          decoration: _inputDecoration('Date of Birth', Icons.calendar_today_outlined, isDark),
+          validator: (v) => v!.isEmpty ? 'Required' : null,
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _phoneController,
+          keyboardType: TextInputType.phone,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
+          ],
+          decoration: _inputDecoration('Phone Number', Icons.phone_android_rounded, isDark),
+          validator: (v) {
+            if (v!.isEmpty) return 'Required';
+            if (v.length < 10) return 'Must be 10 digits';
+            return null;
+          },
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          value: _selectedProfession,
+          isExpanded: true,
+          dropdownColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+          decoration: _inputDecoration('Profession', Icons.work_outline, isDark),
+          items: _professions.map((p) => DropdownMenuItem(value: p, child: Text(p, overflow: TextOverflow.ellipsis))).toList(),
+          onChanged: (v) => setState(() => _selectedProfession = v),
+          validator: (v) => v == null ? 'Required' : null,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _selectedRegion,
+                isExpanded: true,
+                dropdownColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                decoration: _inputDecoration('Region', Icons.map_outlined, isDark),
+                items: _regions.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))).toList(),
+                onChanged: (v) => setState(() => _selectedRegion = v),
+                validator: (v) => v == null ? 'Required' : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              height: 56,
+              width: 56,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.greenAccent.withOpacity(0.1) : Colors.green[50],
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isDark ? Colors.greenAccent.withOpacity(0.3) : Colors.green.withOpacity(0.3)),
+              ),
+              child: IconButton(
+                onPressed: _isLocationLoading ? null : _useCurrentLocation,
+                icon: _isLocationLoading 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(Icons.my_location_rounded, color: isDark ? Colors.greenAccent : Colors.green),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+        FilledButton.icon(
+          onPressed: _saveProfile,
+          icon: const Icon(Icons.save_rounded),
+          label: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(double.infinity, 56),
+            backgroundColor: isDark ? Colors.greenAccent : null,
+            foregroundColor: isDark ? Colors.black : null,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, IconData icon, [TextInputType? type]) {
+  Widget _buildInfoCard(bool isDark, List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.4 : 0.03), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: isDark ? Colors.greenAccent : Colors.green, size: 22),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 2),
+                Text(
+                  value.isEmpty ? 'Not Set' : value,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider(bool isDark) {
+    return Divider(height: 1, indent: 70, color: isDark ? Colors.white10 : Colors.grey[200]);
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller, IconData icon, bool isDark) {
     return TextFormField(
       controller: controller,
-      keyboardType: type,
-      decoration: _inputDecoration(label, icon),
+      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]'))],
+      decoration: _inputDecoration(label, icon, isDark),
       validator: (v) => v!.isEmpty ? 'Required' : null,
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon) {
+  InputDecoration _inputDecoration(String label, IconData icon, bool isDark) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      labelStyle: TextStyle(color: isDark ? Colors.grey : Colors.black54),
+      prefixIcon: Icon(icon, color: isDark ? Colors.grey : Colors.green),
+      filled: true,
+      fillColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: isDark ? BorderSide.none : BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: isDark ? BorderSide.none : BorderSide(color: Colors.grey.shade300),
+      ),
     );
   }
 }
