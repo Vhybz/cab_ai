@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../services/app_provider.dart';
 import '../services/notification_service.dart';
+import '../models/schedule_model.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -19,37 +20,41 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   TimeOfDay _selectedTime = TimeOfDay.now();
   String _selectedActivity = 'Scanning';
 
-  // List of possible farming activities with descriptions
   final List<Map<String, dynamic>> _activities = [
     {
       'name': 'Scanning',
       'icon': Icons.qr_code_scanner_rounded,
       'color': Colors.blue,
-      'desc': 'Use AI to check for diseases.'
+      'desc': 'Use AI to check for diseases early.',
+      'steps': ['Walk diagonally across field', 'Select 10 random leaves', 'Scan with Cabbage Doctor', 'Note high-risk areas']
     },
     {
       'name': 'Watering',
       'icon': Icons.water_drop_rounded,
       'color': Colors.cyan,
-      'desc': 'Ensures soil moisture is optimal.'
+      'desc': 'Maintain consistent soil moisture.',
+      'steps': ['Check soil 2-inches deep', 'Water at the base of plants', 'Avoid wetting leaves', 'Best done before 9 AM']
     },
     {
       'name': 'Pruning',
       'icon': Icons.content_cut_rounded,
       'color': Colors.orange,
-      'desc': 'Remove infected or dead leaves.'
+      'desc': 'Remove damaged or infected parts.',
+      'steps': ['Identify V-shaped lesions', 'Use sterilized tools', 'Remove lower yellow leaves', 'Dispose debris away from field']
     },
     {
       'name': 'Fertilizing',
       'icon': Icons.grain_rounded,
       'color': Colors.purple,
-      'desc': 'Apply nutrients for head growth.'
+      'desc': 'Apply nitrogen-rich nutrients.',
+      'steps': ['Apply 3 weeks after planting', 'Side-dress 6 inches from stem', 'Water immediately after', 'Follow local dosage guide']
     },
     {
       'name': 'Pest Control',
       'icon': Icons.bug_report_rounded,
       'color': Colors.red,
-      'desc': 'Inspect for aphids or caterpillars.'
+      'desc': 'Monitor for caterpillars & aphids.',
+      'steps': ['Look under leaf surfaces', 'Check for silk or holes', 'Identify beneficial insects', 'Use organic neem spray if needed']
     },
   ];
 
@@ -57,6 +62,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
+    _updateSelectedActivityToSuggestion(_focusedDay);
+  }
+
+  void _updateSelectedActivityToSuggestion(DateTime day) {
+    final provider = Provider.of<AppProvider>(context, listen: false);
+    final suggestion = provider.getSuggestedActivity(day);
+    
+    for (var act in _activities) {
+      if (suggestion.toLowerCase().contains(act['name'].toLowerCase())) {
+        setState(() => _selectedActivity = act['name']);
+        break;
+      }
+    }
   }
 
   Future<void> _selectTime(BuildContext context) async {
@@ -65,9 +83,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       initialTime: _selectedTime,
     );
     if (picked != null && picked != _selectedTime) {
-      setState(() {
-        _selectedTime = picked;
-      });
+      setState(() => _selectedTime = picked);
     }
   }
 
@@ -89,21 +105,60 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       return;
     }
 
+    final provider = Provider.of<AppProvider>(context, listen: false);
+    
+    final newSchedule = Schedule(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      activity: _selectedActivity,
+      dateTime: scheduledDateTime,
+    );
+    
+    provider.addSchedule(newSchedule);
+
     NotificationService().scheduleNotification(
-      _selectedActivity.hashCode,
-      'Cabbage Doctor Reminder',
-      'It\'s time for your scheduled $_selectedActivity task!',
+      newSchedule.id.hashCode,
+      'Cabbage Doctor: ${provider.tr(_selectedActivity)}',
+      'It\'s time for your scheduled ${provider.tr(_selectedActivity)} task!',
       scheduledDateTime,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$_selectedActivity reminder set for ${DateFormat('MMM dd, hh:mm a').format(scheduledDateTime)}'),
+        content: Text('${provider.tr(_selectedActivity)} scheduled for ${DateFormat('MMM dd, hh:mm a').format(scheduledDateTime)}'),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(AppProvider provider, Schedule schedule) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(provider.tr('Delete Schedule?')),
+        content: Text(provider.tr('This action cannot be undone.')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(provider.tr('CANCEL')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(provider.tr('DELETE')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      provider.deleteSchedule(schedule.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(provider.tr('Schedule deleted permanently'))),
+        );
+      }
+    }
   }
 
   @override
@@ -114,7 +169,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Farm Planner'),
+        title: Text(provider.tr('Farm Planner')),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -122,19 +177,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. AI Suggestion Section
-            _buildSmartSuggestionSection(context, provider),
+            // 1. AI Suggestion Hero
+            _buildSmartSuggestionHero(context, provider),
 
-            // 2. Calendar Card
+            // 2. Calendar Section
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-              child: Row(
-                children: [
-                  Icon(Icons.calendar_month_rounded, color: colorScheme.primary, size: 20),
-                  const SizedBox(width: 8),
-                  Text('Select Date', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                ],
-              ),
+              child: Text(provider.tr('Crop Calendar'), style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             ),
             Card(
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -149,6 +198,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     _selectedDay = selectedDay;
                     _focusedDay = focusedDay;
                   });
+                  _updateSelectedActivityToSuggestion(selectedDay);
                 },
                 onFormatChanged: (format) => setState(() => _calendarFormat = format),
                 calendarStyle: CalendarStyle(
@@ -158,20 +208,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(color: colorScheme.primary, width: 1),
                   ),
-                  todayTextStyle: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold),
                 ),
                 headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true),
               ),
             ),
 
-            // 3. Plan Activity Section
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 32, 24, 16),
-              child: Text('Plan Your Task', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            // 3. Activity Selector
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+              child: Text(provider.tr('Choose Activity'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             ),
             
             SizedBox(
-              height: 120,
+              height: 110,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -190,20 +239,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         decoration: BoxDecoration(
                           color: isSelected ? colorScheme.primary : theme.cardColor,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
-                          ),
-                          boxShadow: isSelected ? [
-                            BoxShadow(color: colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))
-                          ] : [],
+                          border: Border.all(color: isSelected ? colorScheme.primary : colorScheme.outlineVariant),
+                          boxShadow: isSelected ? [BoxShadow(color: colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(act['icon'], color: isSelected ? Colors.white : act['color'], size: 32),
+                            Icon(act['icon'], color: isSelected ? Colors.white : act['color'], size: 28),
                             const SizedBox(height: 8),
                             Text(
-                              act['name'],
+                              provider.tr(act['name']),
                               style: TextStyle(
                                 color: isSelected ? Colors.white : theme.textTheme.bodyMedium?.color,
                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -219,55 +264,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               ),
             ),
 
-            // 4. Time Picker & Action
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceVariant.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Reminder Time', style: TextStyle(fontWeight: FontWeight.bold)),
-                        TextButton.icon(
-                          onPressed: () => _selectTime(context),
-                          icon: const Icon(Icons.edit_calendar_rounded, size: 18),
-                          label: Text(
-                            _selectedTime.format(context),
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: colorScheme.primary),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _scheduleActivity,
-                        icon: const Icon(Icons.notification_add_rounded),
-                        label: Text('Set Reminder for $_selectedActivity'),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            // 4. Activity Details & Schedule Button
+            _buildActivityDetailsCard(context, provider, colorScheme),
 
             // 5. Activity Log
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, 16),
-              child: Text('Recent Logged Activities', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 40, 24, 16),
+              child: Text(provider.tr('Planned Schedule'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
-            _buildActivityLog(provider, theme, colorScheme),
+            _buildScheduleList(provider, theme, colorScheme),
 
             const SizedBox(height: 100),
           ],
@@ -276,10 +281,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  Widget _buildSmartSuggestionSection(BuildContext context, AppProvider provider) {
+  Widget _buildSmartSuggestionHero(BuildContext context, AppProvider provider) {
     final colorScheme = Theme.of(context).colorScheme;
     final day = _selectedDay ?? DateTime.now();
     final suggestion = provider.getSuggestedActivity(day);
+    final isTwi = provider.language == 'Twi';
     
     return Container(
       width: double.infinity,
@@ -301,71 +307,134 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'SMART SUGGESTION FOR ${DateFormat('EEEE').format(day).toUpperCase()}',
-                style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(12)),
+                child: Text(provider.tr('EXPERT CHOICE'), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
               ),
+              const Spacer(),
+              const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            'We recommend doing a "$suggestion" session.',
-            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+            isTwi ? 'Afutuo: $suggestion' : 'Recommended: $suggestion',
+            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
           Text(
-            _getSuggestionDetails(suggestion),
-            style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, height: 1.4),
+            '${provider.tr('For')} ${DateFormat('EEEE, MMM dd').format(day)}. ${provider.tr('Click to plan it below.')}',
+            style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
           ),
         ],
       ),
     );
   }
 
-  String _getSuggestionDetails(String suggestion) {
-    if (suggestion.contains('Water')) return 'Proper hydration is critical for head formation. Best done before 9 AM.';
-    if (suggestion.contains('Scan')) return 'Check at least 10 leaves from different parts of your field for accuracy.';
-    if (suggestion.contains('Pruning')) return 'Cleaning the field reduces the risk of Black Rot spreading through soil splash.';
-    if (suggestion.contains('Fertilizer')) return 'Nitrogen-rich fertilizer helps cabbage grow large and healthy heads.';
-    return 'Regular scouting helps you find issues before they become a problem.';
+  Widget _buildActivityDetailsCard(BuildContext context, AppProvider provider, ColorScheme colorScheme) {
+    final currentAct = _activities.firstWhere((a) => a['name'] == _selectedActivity);
+    
+    return Container(
+      margin: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(currentAct['icon'], color: currentAct['color']),
+              const SizedBox(width: 12),
+              Text(provider.tr(currentAct['name']), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(provider.tr(currentAct['desc']), style: const TextStyle(color: Colors.grey, fontSize: 14)),
+          const Divider(height: 32),
+          Text('${provider.tr('HOW TO DO IT')}:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1, color: Colors.grey)),
+          const SizedBox(height: 12),
+          ...List.generate(currentAct['steps'].length, (index) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${index + 1}. ', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary)),
+                Expanded(child: Text(provider.tr(currentAct['steps'][index]), style: const TextStyle(fontSize: 14))),
+              ],
+            ),
+          )),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              const Icon(Icons.alarm_rounded, size: 18),
+              const SizedBox(width: 8),
+              Text('${provider.tr('Time')}:', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              TextButton(
+                onPressed: () => _selectTime(context),
+                child: Text(_selectedTime.format(context), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _scheduleActivity,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              child: Text(provider.tr('Add to Field Schedule'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  Widget _buildActivityLog(AppProvider provider, ThemeData theme, ColorScheme colorScheme) {
-    if (provider.history.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(40.0),
-          child: Text('No history available yet.', style: TextStyle(color: Colors.grey)),
-        ),
-      );
+  Widget _buildScheduleList(AppProvider provider, ThemeData theme, ColorScheme colorScheme) {
+    final upcoming = provider.schedules.where((s) => s.dateTime.isAfter(DateTime.now())).toList();
+    
+    if (upcoming.isEmpty) {
+      return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text(provider.tr('No upcoming tasks.'), style: const TextStyle(color: Colors.grey))));
     }
 
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: provider.history.length > 5 ? 5 : provider.history.length,
+      itemCount: upcoming.length,
       itemBuilder: (context, index) {
-        final item = provider.history[index];
+        final item = upcoming[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: item.diseaseName == 'Healthy' ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-              child: Icon(
-                item.diseaseName == 'Healthy' ? Icons.check_circle_rounded : Icons.warning_rounded,
-                color: item.diseaseName == 'Healthy' ? Colors.green : Colors.red,
-                size: 20,
-              ),
+            leading: Icon(_getActivityIcon(item.activity), color: colorScheme.primary),
+            title: Text(provider.tr(item.activity), style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(DateFormat('MMM dd, hh:mm a').format(item.dateTime)),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+              onPressed: () => _confirmDelete(provider, item),
             ),
-            title: Text(item.diseaseName, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(DateFormat('MMM dd - hh:mm a').format(item.dateTime)),
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
           ),
         );
       },
     );
+  }
+
+  IconData _getActivityIcon(String activity) {
+    switch (activity) {
+      case 'Scanning': return Icons.qr_code_scanner_rounded;
+      case 'Watering': return Icons.water_drop_rounded;
+      case 'Pruning': return Icons.content_cut_rounded;
+      case 'Fertilizing': return Icons.grain_rounded;
+      case 'Pest Control': return Icons.bug_report_rounded;
+      default: return Icons.event_note_rounded;
+    }
   }
 }

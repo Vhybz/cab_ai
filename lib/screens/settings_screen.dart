@@ -13,75 +13,66 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(provider.tr('Settings'), style: const TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: ListView(
-        children: [
-          _buildSectionHeader('Appearance'),
-          SwitchListTile(
-            secondary: Icon(Icons.dark_mode_outlined, color: colorScheme.primary),
-            title: const Text('Dark Mode'),
-            subtitle: const Text('Toggle between light and dark themes'),
-            value: provider.themeMode == ThemeMode.dark,
-            onChanged: (bool value) {
-              provider.toggleTheme(value);
-            },
-          ),
-          
-          _buildSectionHeader('Localization'),
-          ListTile(
-            leading: Icon(Icons.translate_rounded, color: colorScheme.primary),
-            title: const Text('App Language'),
-            subtitle: Text(provider.language),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => _showLanguageDialog(context, provider),
-          ),
-          
-          _buildSectionHeader('General'),
-          SwitchListTile(
-            secondary: Icon(Icons.notifications_none_rounded, color: colorScheme.primary),
-            title: const Text('Notifications'),
-            subtitle: const Text('Get crop health and watering reminders'),
-            value: true,
-            onChanged: (bool value) {},
-          ),
-          
-          _buildSectionHeader('Account & Security'),
-          ListTile(
-            leading: Icon(Icons.lock_outline_rounded, color: colorScheme.primary),
-            title: const Text('Privacy Policy'),
-            onTap: () {},
-          ),
-          ListTile(
-            leading: Icon(Icons.help_outline_rounded, color: colorScheme.primary),
-            title: const Text('Help & Support'),
-            onTap: () {},
-          ),
-          
-          const SizedBox(height: 32),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-              label: const Text('Logout', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.redAccent),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader(provider.tr('Appearance')),
+            SwitchListTile(
+              secondary: Icon(Icons.dark_mode_outlined, color: colorScheme.primary),
+              title: Text(provider.tr('Dark Mode')),
+              subtitle: Text(provider.tr('Toggle between light and dark themes')),
+              value: provider.themeMode == ThemeMode.dark,
+              onChanged: (bool value) {
+                provider.toggleTheme(value);
+              },
+            ),
+            
+            _buildSectionHeader(provider.tr('Localization')),
+            ListTile(
+              leading: Icon(Icons.translate_rounded, color: colorScheme.primary),
+              title: Text(provider.tr('App Language')),
+              subtitle: Text(provider.language),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => _showLanguageDialog(context, provider),
+            ),
+            
+            _buildSectionHeader(provider.tr('General')),
+            SwitchListTile(
+              secondary: Icon(Icons.notifications_none_rounded, color: colorScheme.primary),
+              title: Text(provider.tr('Notifications')),
+              subtitle: Text(provider.tr('Get crop health and watering reminders')),
+              value: provider.notificationsEnabled,
+              onChanged: (bool value) {
+                provider.toggleNotifications(value);
+              },
+            ),
+            
+            _buildSectionHeader(provider.tr('Account & Security')),
+            ListTile(
+              leading: Icon(Icons.lock_outline_rounded, color: colorScheme.primary),
+              title: Text(provider.tr('Privacy Policy')),
+              onTap: () => _showPrivacyPolicy(context),
+            ),
+            ListTile(
+              leading: Icon(Icons.help_outline_rounded, color: colorScheme.primary),
+              title: Text(provider.tr('Help & Support')),
+              onTap: () => _showHelpAndSupport(context),
+            ),
+            
+            const SizedBox(height: 40),
+            Center(
+              child: Text(
+                'cabage_ai v1.0.0',
+                style: TextStyle(color: colorScheme.outline, fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
-          ),
-          const SizedBox(height: 40),
-          Center(
-            child: Text(
-              'ca_ai v1.0.0',
-              style: TextStyle(color: colorScheme.outline, fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }
@@ -91,7 +82,7 @@ class SettingsScreen extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12, letterSpacing: 1.2),
+        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 11, letterSpacing: 1.2),
       ),
     );
   }
@@ -100,7 +91,7 @@ class SettingsScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Select Language', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(provider.tr('Select Language'), style: const TextStyle(fontWeight: FontWeight.bold)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -122,6 +113,53 @@ class SettingsScreen extends StatelessWidget {
         if (value != null) provider.setLanguage(value);
         Navigator.pop(context);
       },
+    );
+  }
+
+  void _showPrivacyPolicy(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Privacy Policy'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        content: const SingleChildScrollView(
+          child: Text(
+            'Your privacy is important to us. Cabbage Doctor AI collects image data for disease classification and location data for accurate weather reporting. \n\n1. Data Security: Your scans are stored securely in Supabase Cloud.\n2. Permissions: We require Camera, Storage, and Location access to function correctly.\n3. Third Parties: We do not sell your personal farming data to third parties.',
+            style: TextStyle(fontSize: 14, height: 1.5),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpAndSupport(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Help & Support'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.email_outlined),
+              title: Text('Email Us'),
+              subtitle: Text('support@cabbagedoctor.uenr.edu.gh'),
+            ),
+            ListTile(
+              leading: Icon(Icons.language),
+              title: Text('Visit Website'),
+              subtitle: Text('www.cabbagedoctor.gh'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
     );
   }
 }

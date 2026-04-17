@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'onboarding_screen.dart';
+import 'home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,15 +14,28 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Navigate to Onboarding after 4 seconds
-    Future.delayed(const Duration(seconds: 4), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
-        );
-      }
-    });
+    _navigateToNext();
+  }
+
+  Future<void> _navigateToNext() async {
+    await Future.delayed(const Duration(seconds: 4));
+    if (!mounted) return;
+
+    final session = Supabase.instance.client.auth.currentSession;
+    
+    if (session != null) {
+      // User is already logged in, go to Home
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    } else {
+      // No session, check if it's the first time for onboarding
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+      );
+    }
   }
 
   @override
@@ -29,12 +44,7 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Background Image
-          Image.asset(
-            'assets/images/c9.jpg',
-            fit: BoxFit.cover,
-          ),
-          // Gradient Overlay for readability
+          Image.asset('assets/images/c9.jpg', fit: BoxFit.cover),
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -48,12 +58,9 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
           ),
-
-          // Content
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo Image with glass effect
               Container(
                 width: 140,
                 height: 140,
@@ -64,10 +71,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   border: Border.all(color: Colors.white.withOpacity(0.5)),
                 ),
                 child: ClipOval(
-                  child: Image.asset(
-                    'assets/images/c7.jpg',
-                    fit: BoxFit.cover,
-                  ),
+                  child: Image.asset('assets/images/c7.jpg', fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(height: 30),
@@ -97,8 +101,6 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ],
           ),
-          
-          // Bottom Footer (Moved from top to down)
           Positioned(
             bottom: 60,
             left: 0,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/app_provider.dart';
 import 'screens/splash_screen.dart';
 import 'services/notification_service.dart';
@@ -9,10 +10,17 @@ void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Initialize Supabase with your credentials
+  await Supabase.initialize(
+    url: 'https://xshzslaaqcinvhlzudxt.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzaHpzbGFhcWNpbnZobHp1ZHh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNjUzNTIsImV4cCI6MjA5MTk0MTM1Mn0.LjeSqui4AKyiF6S_cqqWa8haJRfMtrgIAReM0Az_qVw',
+  );
+  
   // Initialize Hive for offline storage
   await Hive.initFlutter();
   await Hive.openBox('settings');
   await Hive.openBox('scan_history');
+  await Hive.openBox('schedules');
   
   // Initialize notification service
   await NotificationService().init();

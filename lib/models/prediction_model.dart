@@ -5,6 +5,9 @@ class Prediction {
   final String treatment;
   final String imagePath;
   final DateTime dateTime;
+  final bool isAsset;
+  final bool isLeaf;
+  final bool isNetwork; // Added to identify cloud images
 
   Prediction({
     required this.diseaseName,
@@ -13,10 +16,11 @@ class Prediction {
     required this.treatment,
     required this.imagePath,
     required this.dateTime,
+    this.isAsset = false,
+    this.isLeaf = true,
+    this.isNetwork = false,
   });
 
-  // Convert a Prediction into a Map. The keys must correspond to the names of the
-  // columns in the database or keys in JSON.
   Map<String, dynamic> toMap() {
     return {
       'diseaseName': diseaseName,
@@ -25,10 +29,12 @@ class Prediction {
       'treatment': treatment,
       'imagePath': imagePath,
       'dateTime': dateTime.toIso8601String(),
+      'isAsset': isAsset,
+      'isLeaf': isLeaf,
+      'isNetwork': isNetwork,
     };
   }
 
-  // Convert a Map into a Prediction.
   factory Prediction.fromMap(Map<String, dynamic> map) {
     return Prediction(
       diseaseName: map['diseaseName'],
@@ -37,6 +43,9 @@ class Prediction {
       treatment: map['treatment'],
       imagePath: map['imagePath'],
       dateTime: DateTime.parse(map['dateTime']),
+      isAsset: map['isAsset'] ?? false,
+      isLeaf: map['isLeaf'] ?? true,
+      isNetwork: map['isNetwork'] ?? false,
     );
   }
 }

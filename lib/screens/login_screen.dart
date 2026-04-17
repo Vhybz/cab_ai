@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/app_provider.dart';
 import 'signup_screen.dart';
 import 'home_screen.dart';
@@ -16,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -24,113 +26,122 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _handleLogin() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+      try {
+        final provider = Provider.of<AppProvider>(context, listen: false);
+        final response = await provider.signIn(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+        );
+
+        if (response.user != null && mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e is AuthException ? e.message : 'An error occurred during login'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final provider = Provider.of<AppProvider>(context, listen: false);
 
     return Scaffold(
       body: Stack(
         children: [
-          // Background Aesthetic
-          Positioned(
-            top: -100,
-            right: -100,
-            child: CircleAvatar(
-              radius: 150,
-              backgroundColor: colorScheme.primary.withOpacity(0.05),
+          Positioned.fill(child: Image.asset('assets/images/c8.jpg', fit: BoxFit.cover)),
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.3),
+                    Colors.black.withOpacity(0.7),
+                    Colors.black.withOpacity(0.9),
+                  ],
+                ),
+              ),
             ),
           ),
+          
           SafeArea(
             child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 40),
-                    // App Logo
                     Center(
                       child: Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withOpacity(0.4),
-                          borderRadius: BorderRadius.circular(28),
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withOpacity(0.5)),
                         ),
-                        child: Icon(Icons.spa_rounded, size: 60, color: colorScheme.primary),
+                        child: const CircleAvatar(
+                          radius: 45,
+                          backgroundImage: AssetImage('assets/images/c7.jpg'),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 32),
-                    Text(
+                    const Text(
                       'Cabbage Doctor',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: colorScheme.onSurface,
-                        letterSpacing: -1,
-                      ),
+                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -1),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Sign in to continue your field work',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                      style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16),
                     ),
                     const SizedBox(height: 48),
 
-                    // Login Form
                     Form(
                       key: _formKey,
                       child: Column(
                         children: [
                           TextFormField(
                             controller: _emailController,
-                            decoration: InputDecoration(
-                              labelText: 'Email Address',
-                              hintText: 'name@example.com',
-                              prefixIcon: const Icon(Icons.alternate_email_rounded),
-                              filled: true,
-                              fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
+                            style: const TextStyle(color: Colors.white),
+                            decoration: _inputDecoration('Email Address', Icons.alternate_email_rounded),
                             keyboardType: TextInputType.emailAddress,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) return 'Please enter email';
-                              if (!value.contains('@')) return 'Invalid email';
-                              return null;
-                            },
+                            validator: (v) => v!.isEmpty ? 'Enter email' : (!v.contains('@') ? 'Invalid email' : null),
                           ),
                           const SizedBox(height: 20),
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock_person_rounded),
-                              filled: true,
-                              fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
+                            style: const TextStyle(color: Colors.white),
+                            decoration: _inputDecoration('Password', Icons.lock_person_rounded).copyWith(
                               suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                                ),
+                                icon: Icon(_obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.white70),
                                 onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                               ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) return 'Please enter password';
-                              if (value.length < 6) return 'Password too short';
-                              return null;
-                            },
+                            validator: (v) => v!.isEmpty ? 'Enter password' : null,
                           ),
                         ],
                       ),
@@ -140,61 +151,49 @@ class _LoginScreenState extends State<LoginScreen> {
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: () {},
-                        child: Text('Forgot Password?', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
+                        child: const Text('Forgot Password?', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
                       ),
                     ),
                     const SizedBox(height: 32),
 
-                    // Action Buttons
                     FilledButton(
-                      onPressed: () {
-                        if (_formKey.currentState!.validate()) {
-                          provider.setUserName(_emailController.text.split('@')[0]);
-                          Navigator.pushReplacement(
-                            context, MaterialPageRoute(builder: (context) => const HomeScreen()),
-                          );
-                        }
-                      },
+                      onPressed: _isLoading ? null : _handleLogin,
                       style: FilledButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 18),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 2,
                       ),
-                      child: const Text('Sign In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: _isLoading 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Sign In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 16),
 
                     OutlinedButton.icon(
                       onPressed: () {
                         provider.setGuestUser();
-                        Navigator.pushReplacement(
-                          context, MaterialPageRoute(builder: (context) => const HomeScreen()),
-                        );
+                        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const HomeScreen()), (route) => false);
                       },
                       icon: const Icon(Icons.bolt_rounded, size: 20),
-                      label: const Flexible(
-                        child: Text(
-                          'Quick Scan as Guest',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
+                      label: const Text('Quick Scan as Guest'),
                       style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 18),
-                        side: BorderSide(color: colorScheme.primary.withOpacity(0.5)),
+                        side: const BorderSide(color: Colors.white38),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                     ),
                     const SizedBox(height: 48),
 
-                    // Footer
                     Wrap(
                       alignment: WrapAlignment.center,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text("New to Cabbage Doctor?", style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                        const Text("New to Cabbage Doctor?", style: TextStyle(color: Colors.white70)),
                         TextButton(
                           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SignUpScreen())),
-                          child: Text('Create Account', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w900)),
+                          child: const Text('Create Account', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w900)),
                         ),
                       ],
                     ),
@@ -206,6 +205,17 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white70),
+      prefixIcon: Icon(icon, color: Colors.white70),
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.1),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
     );
   }
 }

@@ -22,7 +22,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
   Map<String, dynamic>? _currentWeather;
   Map<String, dynamic>? _hourlyData;
   bool _isLoading = true;
-  String _errorMessage = '';
 
   // List of major farming regions in Ghana for manual selection
   final Map<String, List<double>> _regions = {
@@ -61,7 +60,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
       
       if (permission == LocationPermission.deniedForever) return;
 
-      // Increased accuracy to ensure precise location detection
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -85,7 +83,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
   Future<void> _fetchWeather() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = '';
     });
 
     try {
@@ -102,13 +99,11 @@ class _WeatherScreenState extends State<WeatherScreen> {
         });
       } else {
         setState(() {
-          _errorMessage = 'Failed to load weather data.';
           _isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'An error occurred while fetching weather.';
         _isLoading = false;
       });
     }
@@ -124,7 +119,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
     _fetchWeather();
   }
 
-  String _getFarmAdvice(int weatherCode, double temp, List<dynamic> humidities) {
+  List<String> _getDetailedFarmAdvice(int weatherCode, double temp, List<dynamic> humidities) {
+    List<String> advice = [];
     double avgHumidity = 0;
     if (humidities.isNotEmpty) {
       int startIndex = humidities.length > 24 ? humidities.length - 48 : 0;
@@ -133,14 +129,39 @@ class _WeatherScreenState extends State<WeatherScreen> {
       avgHumidity = lastDayHumid.map((e) => e as num).reduce((a, b) => a + b) / lastDayHumid.length;
     }
 
-    if (avgHumidity > 85) {
-      return 'High humidity detected. This increases risk of fungal diseases. Inspect leaves for spots.';
-    } else if (weatherCode >= 51 && weatherCode <= 67) {
-      return 'Rain detected. Avoid applying fertilizers now. Ensure proper drainage.';
-    } else if (temp > 30) {
-      return 'High heat detected. Cabbages need more water. Consider providing shade.';
+    // Disease Risks
+    if (avgHumidity > 80) {
+      advice.add('🚨 CRITICAL: High humidity detected ($avgHumidity%). Fungal diseases like Downy Mildew spread fast in these conditions. Check the underside of your cabbage leaves immediately.');
+    } else if (avgHumidity < 40) {
+      advice.add('💧 DRY AIR: Low humidity can lead to moisture stress. Ensure your irrigation system is functional.');
     }
-    return 'Conditions are stable. Continue with your scheduled maintenance.';
+
+    // Weather Specifics
+    if (weatherCode >= 51 && weatherCode <= 67) {
+      advice.add('🌧️ RAIN ALERT: Steady rain is falling. Do not apply top-dress fertilizers now as they will wash away. Check your field drainage to prevent waterlogging.');
+    } else if (weatherCode >= 95) {
+      advice.add('⛈️ STORM ALERT: Heavy storms detected. Young cabbage seedlings may need physical protection. Clear any debris that could block drainage channels.');
+    } else if (weatherCode == 0) {
+      advice.add('☀️ CLEAR SKY: Optimal photosynthesis weather. A great time for weeding and detailed field scouting.');
+    }
+
+    // Temperature Advice
+    if (temp > 30) {
+      advice.add('🌡️ HIGH HEAT: Temperature is $temp°C. Cabbages are cool-season crops. Increase watering frequency and, if possible, use mulch to keep the soil cool.');
+    } else if (temp < 15) {
+      advice.add('❄️ COOL WEATHER: Growth may slow down slightly, but this is generally good for cabbage head quality.');
+    }
+
+    // Pest Advice
+    if (weatherCode <= 3 && temp > 25) {
+      advice.add('🦋 PEST WATCH: Warm, dry weather is ideal for Diamondback Moths. Scrutinize the core of the cabbage heads for larvae.');
+    }
+
+    if (advice.isEmpty) {
+      advice.add('✅ STABLE CONDITIONS: Weather is currently favorable for cabbage growth. Proceed with your regular farm schedule.');
+    }
+
+    return advice;
   }
 
   @override
@@ -151,7 +172,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Farm Weather', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Farm Weather Hub', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           IconButton(
@@ -177,19 +198,52 @@ class _WeatherScreenState extends State<WeatherScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildMainWeatherCard(colorScheme, isDark),
-                    const SizedBox(height: 24),
-                    _buildDecisionCard(colorScheme),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
+                    _buildAdviceSection(colorScheme),
+                    const SizedBox(height: 32),
                     Text('7-Day Temperature Trend', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
                     _buildTrendChart(colorScheme, isDark),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                     _buildDetailsGrid(colorScheme),
                     const SizedBox(height: 100),
                   ],
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildAdviceSection(ColorScheme colorScheme) {
+    final code = _currentWeather!['weather_code'];
+    final temp = _currentWeather!['temperature_2m'].toDouble();
+    final adviceList = _getDetailedFarmAdvice(code, temp, _hourlyData!['relative_humidity_2m']);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.auto_awesome, color: colorScheme.primary, size: 20),
+            const SizedBox(width: 8),
+            Text('AI FARMER ASSISTANT', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w900, letterSpacing: 1.5, fontSize: 12)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ...adviceList.map((advice) => Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceVariant.withOpacity(0.4),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
+          ),
+          child: Text(
+            advice,
+            style: const TextStyle(fontSize: 15, height: 1.6, fontWeight: FontWeight.w500),
+          ),
+        )).toList(),
+      ],
     );
   }
 
@@ -258,35 +312,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
           const SizedBox(height: 10),
           Text('${temp.toStringAsFixed(1)}°C', style: const TextStyle(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w900)),
           Text(desc.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 16, letterSpacing: 2, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDecisionCard(ColorScheme colorScheme) {
-    final code = _currentWeather!['weather_code'];
-    final temp = _currentWeather!['temperature_2m'].toDouble();
-    final advice = _getFarmAdvice(code, temp, _hourlyData!['relative_humidity_2m']);
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceVariant.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.psychology_rounded, color: colorScheme.primary),
-              const SizedBox(width: 12),
-              Text('Smart Farm Decision', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 18)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(advice, style: const TextStyle(fontSize: 15, height: 1.5)),
         ],
       ),
     );

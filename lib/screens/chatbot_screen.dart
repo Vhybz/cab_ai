@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/app_provider.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -9,6 +11,7 @@ class ChatbotScreen extends StatefulWidget {
 
 class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [
     {
       'role': 'bot',
@@ -16,42 +19,47 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     },
   ];
 
-  void _sendMessage() {
-    if (_controller.text.trim().isEmpty) return;
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _sendMessage() async {
+    final provider = context.read<AppProvider>();
+    final prompt = _controller.text.trim();
+    if (prompt.isEmpty || provider.isChatLoading) return;
 
     setState(() {
-      _messages.add({'role': 'user', 'text': _controller.text});
-      String userText = _controller.text.toLowerCase();
+      _messages.add({'role': 'user', 'text': prompt});
       _controller.clear();
-
-      // Simple mock bot logic
-      String botResponse = "I'm not sure about that. Try asking about 'Black Rot', 'Watering', or 'Harvesting'.";
-      
-      if (userText.contains('black rot')) {
-        botResponse = "Black Rot is a bacterial disease. Ensure you use clean seeds and rotate crops every 3 years.";
-      } else if (userText.contains('water')) {
-        botResponse = "Cabbages need consistent moisture. Water early in the morning at the base of the plant.";
-      } else if (userText.contains('harvest')) {
-        botResponse = "Harvest when the heads are firm and have reached the desired size for your variety.";
-      } else if (userText.contains('hello') || userText.contains('hi')) {
-        botResponse = "Hi there! Ready to help with your cabbage farm.";
-      }
-
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          setState(() {
-            _messages.add({'role': 'bot', 'text': botResponse});
-          });
-        }
-      });
     });
+    _scrollToBottom();
+
+    final response = await provider.askGemini(prompt);
+
+    if (mounted) {
+      setState(() {
+        _messages.add({'role': 'bot', 'text': response});
+      });
+      _scrollToBottom();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<AppProvider>();
+    final isTwi = provider.language == 'Twi';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cabbage Assistant'),
+        title: Text(isTwi ? 'Kabeji Mmoawa' : 'Cabbage Assistant'),
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
       ),
@@ -59,9 +67,31 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
+              itemCount: _messages.length + (provider.isChatLoading ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index == _messages.length) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12).copyWith(
+                          bottomLeft: Radius.zero,
+                        ),
+                      ),
+                      child: const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  );
+                }
+
                 final msg = _messages[index];
                 final isBot = msg['role'] == 'bot';
                 return Align(
@@ -76,32 +106,55 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                         bottomRight: isBot ? const Radius.circular(12) : Radius.zero,
                       ),
                     ),
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
-                    child: Text(msg['text']!),
+                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                    child: Text(
+                      msg['text']!,
+                      style: TextStyle(
+                        color: isBot ? Colors.black87 : Colors.black,
+                      ),
+                    ),
                   ),
                 );
               },
             ),
           ),
-          Padding(
+          Container(
             padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -5),
+                ),
+              ],
+            ),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _controller,
+                    enabled: !provider.isChatLoading,
                     decoration: InputDecoration(
-                      hintText: 'Ask a question...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      hintText: isTwi ? 'Bisa asɛm bi...' : 'Ask a question...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     ),
                     onSubmitted: (_) => _sendMessage(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 IconButton.filled(
-                  onPressed: _sendMessage,
-                  icon: const Icon(Icons.send),
+                  onPressed: provider.isChatLoading ? null : _sendMessage,
+                  icon: provider.isChatLoading 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.send),
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
