@@ -2,232 +2,195 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/app_provider.dart';
+import '../models/prediction_model.dart';
 
 class AnalyticsScreen extends StatelessWidget {
   const AnalyticsScreen({super.key});
 
+  bool _isHealthy(Prediction scan) {
+    final name = scan.diseaseName.toLowerCase();
+    return name.contains('healthy') || name.contains('nhyehy');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final history = Provider.of<AppProvider>(context).history;
+    final provider = Provider.of<AppProvider>(context);
+    final history = provider.history;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-    // Logic to count diseases
+    final leafScans = history.where((s) => s.isLeaf).toList();
     Map<String, int> counts = {};
-    for (var item in history) {
-      counts[item.diseaseName] = (counts[item.diseaseName] ?? 0) + 1;
+    int healthyCount = 0;
+    for (var item in leafScans) {
+      if (_isHealthy(item)) healthyCount++; else counts[item.diseaseName] = (counts[item.diseaseName] ?? 0) + 1;
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Field Analytics', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
-      body: history.isEmpty
-          ? Center(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.bar_chart_rounded, size: 80, color: colorScheme.outlineVariant),
-                    const SizedBox(height: 16),
-                    Text('No data available for analytics yet.', style: TextStyle(color: colorScheme.outline)),
-                  ],
-                ),
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 1. Summary Cards
-                  Row(
+      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          _buildSliverAppBar(context, provider, colorScheme),
+          SliverToBoxAdapter(
+            child: history.isEmpty 
+              ? _buildEmptyState(provider, colorScheme)
+              : Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: _buildSummaryCard(context, 'Total Scans', history.length.toString(), Icons.qr_code_scanner_rounded, colorScheme.primary)),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildSummaryCard(context, 'Healthy Leaves', (counts['Healthy'] ?? 0).toString(), Icons.check_circle_rounded, Colors.green)),
+                      _buildHeaderStats(provider, healthyCount, colorScheme, isDark),
+                      const SizedBox(height: 32),
+                      _buildSectionLabel('DISEASE DISTRIBUTION'),
+                      const SizedBox(height: 16),
+                      _buildChartCard(leafScans, healthyCount, counts, isDark),
+                      const SizedBox(height: 32),
+                      _buildSectionLabel('AI INSIGHTS & ACTIONS'),
+                      const SizedBox(height: 16),
+                      _buildAIActions(context, provider, counts, healthyCount),
+                      const SizedBox(height: 32),
+                      _buildSectionLabel('DETAILED BREAKDOWN'),
+                      const SizedBox(height: 16),
+                      _buildBreakdownList(leafScans, healthyCount, counts, isDark, colorScheme),
                     ],
                   ),
-                  const SizedBox(height: 24),
-
-                  // 2. Pie Chart
-                  Text('Disease Distribution', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  Container(
-                    height: 250,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
-                    ),
-                    child: PieChart(
-                      PieChartData(
-                        sections: counts.entries.map((e) {
-                          final isHealthy = e.key == 'Healthy';
-                          return PieChartSectionData(
-                            color: isHealthy ? Colors.green : _getDiseaseColor(e.key),
-                            value: e.value.toDouble(),
-                            title: '${(e.value / history.length * 100).toInt()}%',
-                            radius: 50,
-                            titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                          );
-                        }).toList(),
-                        sectionsSpace: 4,
-                        centerSpaceRadius: 40,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // 3. AI Insights & Suggested Next Steps
-                  Text('AI Recommended Actions', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  _buildAIActions(context, counts),
-                  
-                  const SizedBox(height: 32),
-
-                  // 4. Detailed Breakdown
-                  Text('Detailed Breakdown', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  ...counts.entries.map((e) => _buildStatRow(context, e.key, e.value, history.length)),
-                  
-                  const SizedBox(height: 40),
-                ],
-              ),
-            ),
-    );
-  }
-
-  Color _getDiseaseColor(String name) {
-    switch (name) {
-      case 'Black Rot': return Colors.brown;
-      case 'Downy Mildew': return Colors.orange;
-      case 'White Rust': return Colors.blueGrey;
-      default: return Colors.redAccent;
-    }
-  }
-
-  Widget _buildSummaryCard(BuildContext context, String title, String value, IconData icon, Color color) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 12),
-          Text(
-            value, 
-            style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900, color: color),
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            title, 
-            style: TextStyle(fontSize: 12, color: color.withOpacity(0.8), fontWeight: FontWeight.bold),
-            overflow: TextOverflow.ellipsis,
+                ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAIActions(BuildContext context, Map<String, int> counts) {
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    // Sort diseases by frequency (excluding Healthy)
-    var diseases = counts.entries
-        .where((e) => e.key != 'Healthy')
-        .toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    if (diseases.isEmpty) {
-      return _buildActionItem(
-        context,
-        Icons.verified_rounded,
-        Colors.green,
-        'Excellent field health!',
-        'Continue your weekly AI scans to ensure your crop stays disease-free.',
-      );
-    }
-
-    String topDisease = diseases.first.key;
-    
-    return Column(
-      children: [
-        if (topDisease == 'Black Rot')
-          _buildActionItem(
-            context,
-            Icons.warning_amber_rounded,
-            Colors.orange,
-            'Manage Black Rot Spread',
-            'Based on your data, we suggest clearing all cabbage debris and ensuring good drainage immediately.',
-          ),
-        if (topDisease == 'Downy Mildew')
-          _buildActionItem(
-            context,
-            Icons.water_drop_rounded,
-            Colors.blue,
-            'Control Humidity',
-            'Avoid overhead irrigation. Switch to morning watering to allow leaves to dry before night.',
-          ),
-        if (topDisease == 'White Rust')
-          _buildActionItem(
-            context,
-            Icons.content_cut_rounded,
-            Colors.redAccent,
-            'Urgent Pruning',
-            'Remove and safely dispose of leaves showing white pustules to protect healthy plants.',
-          ),
-        const SizedBox(height: 12),
-        _buildActionItem(
-          context,
-          Icons.calendar_month_rounded,
-          colorScheme.primary,
-          'Schedule Expert Scouting',
-          'Use the Scan Schedule to set a full-field inspection for tomorrow morning.',
+  Widget _buildSliverAppBar(BuildContext context, AppProvider provider, ColorScheme colorScheme) {
+    return SliverAppBar(
+      expandedHeight: 140,
+      pinned: true,
+      stretch: true,
+      backgroundColor: colorScheme.primary,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
+      ),
+      flexibleSpace: FlexibleSpaceBar(
+        centerTitle: true,
+        title: Text(
+          provider.tr('Field Analytics'), 
+          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 18, letterSpacing: -0.5)
         ),
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [colorScheme.primary, colorScheme.secondary],
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -20,
+                bottom: -20,
+                child: Icon(Icons.analytics_rounded, size: 150, color: Colors.white.withOpacity(0.1)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(AppProvider provider, ColorScheme colorScheme) {
+    return Center(
+      child: Column(
+        children: [
+          const SizedBox(height: 100),
+          Icon(Icons.analytics_outlined, size: 80, color: colorScheme.outlineVariant),
+          const SizedBox(height: 16),
+          Text(provider.tr('No data available yet.'), style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderStats(AppProvider provider, int healthy, ColorScheme colorScheme, bool isDark) {
+    return Row(
+      children: [
+        _statBox('Total Scans', provider.history.length.toString(), Icons.qr_code_scanner_rounded, colorScheme.primary, isDark),
+        const SizedBox(width: 12),
+        _statBox('Healthy', healthy.toString(), Icons.eco_rounded, Colors.green, isDark),
       ],
     );
   }
 
-  Widget _buildActionItem(BuildContext context, IconData icon, Color color, String title, String desc) {
-    final theme = Theme.of(context);
+  Widget _statBox(String label, String value, IconData icon, Color color, bool isDark) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: color.withOpacity(0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, color: color, size: 18)),
+            const SizedBox(height: 16),
+            Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChartCard(List<Prediction> leafScans, int healthy, Map<String, int> counts, bool isDark) {
+    if (leafScans.isEmpty) return const SizedBox();
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      height: 250,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.1)),
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: PieChart(
+        PieChartData(
+          sections: [
+            if (healthy > 0) PieChartSectionData(color: Colors.green, value: healthy.toDouble(), title: '', radius: 25),
+            ...counts.entries.map((e) => PieChartSectionData(color: _getColor(e.key), value: e.value.toDouble(), title: '', radius: 20)),
+          ],
+          centerSpaceRadius: 60,
+          sectionsSpace: 4,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAIActions(BuildContext context, AppProvider provider, Map<String, int> counts, int healthy) {
+    final isTwi = provider.language == 'Twi';
+    String title = healthy > 0 && counts.isEmpty ? (isTwi ? 'Afuom yɛ papa' : 'Field is Healthy') : (isTwi ? 'Yɛn adwumayɛ' : 'Immediate Action');
+    String desc = healthy > 0 && counts.isEmpty ? (isTwi ? 'Kɔ so scan dabiara.' : 'Continue regular AI monitoring.') : (isTwi ? 'Hwɛ yadeɛ no so yiye.' : 'Follow the treatment plans for detected diseases.');
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [Colors.orange, Colors.deepOrange.shade700]),
+        borderRadius: BorderRadius.circular(28),
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: color.withOpacity(0.1),
-            child: Icon(icon, color: color, size: 20),
-          ),
+          const Icon(Icons.tips_and_updates_rounded, color: Colors.white, size: 30),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title, 
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
                 const SizedBox(height: 4),
-                Text(
-                  desc, 
-                  style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
-                ),
+                Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
               ],
             ),
           ),
@@ -236,36 +199,47 @@ class AnalyticsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatRow(BuildContext context, String name, int count, int total) {
-    final theme = Theme.of(context);
-    double percent = count / total;
-    Color color = name == 'Healthy' ? Colors.green : _getDiseaseColor(name);
+  Widget _buildBreakdownList(List<Prediction> leafScans, int healthy, Map<String, int> counts, bool isDark, ColorScheme colorScheme) {
+    if (leafScans.isEmpty) return const SizedBox();
+    return Column(
+      children: [
+        if (healthy > 0) _breakdownRow('Healthy', healthy, leafScans.length, Colors.green, isDark),
+        ...counts.entries.map((e) => _breakdownRow(e.key, e.value, leafScans.length, _getColor(e.key), isDark)),
+      ],
+    );
+  }
 
+  Widget _breakdownRow(String name, int count, int total, Color color, bool isDark) {
+    double progress = count / total;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-              const SizedBox(width: 8),
-              Text('$count (${(percent * 100).toStringAsFixed(1)}%)', style: TextStyle(color: theme.colorScheme.outline)),
+              Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text('$count Scans', style: const TextStyle(color: Colors.grey, fontSize: 12)),
             ],
           ),
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: percent,
-              backgroundColor: color.withOpacity(0.1),
-              color: color,
-              minHeight: 12,
-            ),
+            child: LinearProgressIndicator(value: progress, minHeight: 8, backgroundColor: color.withOpacity(0.1), color: color),
           ),
         ],
       ),
     );
+  }
+
+  Color _getColor(String name) {
+    if (name.contains('Black Rot')) return Colors.brown;
+    if (name.contains('Downy')) return Colors.orange;
+    return Colors.redAccent;
+  }
+
+  Widget _buildSectionLabel(String text) {
+    return Text(text, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5));
   }
 }

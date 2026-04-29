@@ -42,277 +42,215 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
-  Future<void> _deleteSelected(AppProvider provider) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(provider.tr('Delete Selected?')),
-        content: Text(provider.tr('This action cannot be undone.')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(provider.tr('CANCEL')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(provider.tr('DELETE')),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      provider.deleteMultipleScans(_selectedItems.toList());
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.tr('Selected Scans Deleted'))),
-      );
-      setState(() {
-        _selectedItems.clear();
-        _isSelectionMode = false;
-      });
-    }
-  }
-
-  Future<void> _deleteAll(AppProvider provider) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(provider.tr('Delete All History?')),
-        content: Text(provider.tr('Are you sure you want to delete all scans?')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(provider.tr('CANCEL')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(provider.tr('DELETE')),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      provider.deleteAllHistory();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.tr('ALL SCANS DELETED'))),
-      );
-      setState(() {
-        _selectedItems.clear();
-        _isSelectionMode = false;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context);
     final history = provider.history;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isSelectionMode 
-            ? '${_selectedItems.length} ${provider.tr('Selected')}' 
-            : provider.tr('Detection History')),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: isDark ? Colors.white : Colors.black,
-        centerTitle: true,
-        leading: _isSelectionMode 
-            ? IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => setState(() {
-                  _isSelectionMode = false;
-                  _selectedItems.clear();
-                }),
-              )
-            : null,
-        actions: [
-          if (history.isNotEmpty) ...[
-            if (_isSelectionMode) ...[
-              IconButton(
-                icon: Icon(_selectedItems.length == history.length 
-                    ? Icons.deselect 
-                    : Icons.select_all),
-                onPressed: () => _selectAll(history),
+      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          _buildSliverAppBar(context, provider, history, colorScheme, isDark),
+          if (history.isEmpty)
+            _buildEmptyState(provider, colorScheme)
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final item = history[index];
+                    final isSelected = _selectedItems.contains(item);
+                    return _buildHistoryItem(context, provider, item, isSelected, isDark, colorScheme);
+                  },
+                  childCount: history.length,
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent),
-                onPressed: () => _deleteSelected(provider),
-              ),
-            ] else ...[
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'select') {
-                    setState(() => _isSelectionMode = true);
-                  } else if (value == 'delete_all') {
-                    _deleteAll(provider);
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'select',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_box_outlined, size: 20),
-                        const SizedBox(width: 12),
-                        Text(provider.tr('Select Scans')),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'delete_all',
-                    child: Row(
-                      children: [
-                        const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 20),
-                        const SizedBox(width: 12),
-                        Text(provider.tr('Delete All'), style: const TextStyle(color: Colors.redAccent)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ]
+            ),
         ],
       ),
-      body: history.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history_rounded, size: 80, color: Colors.grey.withOpacity(0.5)),
-                  const SizedBox(height: 16),
-                  Text(
-                    provider.tr('No history yet.\nStart by scanning a leaf!'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              itemCount: history.length,
-              itemBuilder: (context, index) {
-                final item = history[index];
-                final isSelected = _selectedItems.contains(item);
+      floatingActionButton: _isSelectionMode ? FloatingActionButton.extended(
+        onPressed: () => _deleteSelected(provider),
+        backgroundColor: Colors.redAccent,
+        icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
+        label: Text(provider.tr('DELETE'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ) : null,
+    );
+  }
 
-                return InkWell(
-                  onLongPress: () {
-                    if (!_isSelectionMode) {
-                      _toggleSelection(item);
-                    }
-                  },
-                  onTap: () {
-                    if (_isSelectionMode) {
-                      _toggleSelection(item);
-                    } else {
-                      provider.setCurrentPrediction(item);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ResultScreen()),
-                      );
-                    }
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected 
-                          ? Theme.of(context).colorScheme.primary.withOpacity(0.1) 
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected 
-                            ? Theme.of(context).colorScheme.primary 
-                            : Colors.grey.withOpacity(0.1)
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          if (_isSelectionMode) ...[
-                            Checkbox(
-                              value: isSelected,
-                              onChanged: (val) => _toggleSelection(item),
-                              shape: const CircleBorder(),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Hero(
-                            tag: item.imagePath,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: _buildImage(item),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.diseaseName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  DateFormat('MMM dd, yyyy • hh:mm a').format(item.dateTime),
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  '${(item.confidence * 100).toStringAsFixed(0)}%',
-                                  style: const TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                              if (!_isSelectionMode) ...[
-                                const SizedBox(height: 4),
-                                const Icon(Icons.chevron_right_rounded, size: 20, color: Colors.grey),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
+  Widget _buildSliverAppBar(BuildContext context, AppProvider provider, List<Prediction> history, ColorScheme colorScheme, bool isDark) {
+    return SliverAppBar(
+      expandedHeight: 140,
+      pinned: true,
+      stretch: true,
+      backgroundColor: _isSelectionMode ? Colors.redAccent : colorScheme.primary,
+      elevation: 0,
+      leading: IconButton(
+        icon: Icon(_isSelectionMode ? Icons.close : Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        onPressed: () {
+          if (_isSelectionMode) {
+            setState(() { _isSelectionMode = false; _selectedItems.clear(); });
+          } else {
+            Navigator.pop(context);
+          }
+        },
+      ),
+      flexibleSpace: FlexibleSpaceBar(
+        centerTitle: true,
+        title: Text(
+          _isSelectionMode ? '${_selectedItems.length} ${provider.tr('Selected')}' : provider.tr('Scan History'),
+          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 18, letterSpacing: -0.5),
+        ),
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: _isSelectionMode 
+                ? [Colors.redAccent, Colors.red.shade900]
+                : [colorScheme.primary, colorScheme.secondary],
             ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -20,
+                bottom: -20,
+                child: Icon(
+                  _isSelectionMode ? Icons.delete_forever_rounded : Icons.history_edu_rounded, 
+                  size: 150, 
+                  color: Colors.white.withOpacity(0.1)
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        if (history.isNotEmpty) ...[
+          if (_isSelectionMode)
+            IconButton(
+              icon: Icon(_selectedItems.length == history.length ? Icons.deselect : Icons.select_all, color: Colors.white),
+              onPressed: () => _selectAll(history),
+            )
+          else
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.white),
+              onSelected: (value) {
+                if (value == 'select') setState(() => _isSelectionMode = true);
+                else if (value == 'delete_all') _deleteAll(provider);
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(value: 'select', child: Text(provider.tr('Select Scans'))),
+                PopupMenuItem(value: 'delete_all', child: Text(provider.tr('Delete All'), style: const TextStyle(color: Colors.redAccent))),
+              ],
+            ),
+        ]
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(AppProvider provider, ColorScheme colorScheme) {
+    return SliverFillRemaining(
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history_rounded, size: 80, color: colorScheme.outlineVariant),
+            const SizedBox(height: 16),
+            Text(provider.tr('No history yet.'), style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryItem(BuildContext context, AppProvider provider, Prediction item, bool isSelected, bool isDark, ColorScheme colorScheme) {
+    final isHealthy = item.diseaseName.toLowerCase().contains('healthy') || item.diseaseName.contains('Nhyehy');
+    final statusColor = isHealthy ? Colors.green : (item.diseaseName.contains('Not a') ? Colors.redAccent : Colors.orange);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isSelected ? colorScheme.primary : Colors.grey.withOpacity(0.1), width: 2),
+        boxShadow: [if (!isSelected) BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: InkWell(
+        onLongPress: () => _toggleSelection(item),
+        onTap: () {
+          if (_isSelectionMode) _toggleSelection(item);
+          else {
+            provider.setCurrentPrediction(item);
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const ResultScreen()));
+          }
+        },
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              if (_isSelectionMode) ...[
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (val) => _toggleSelection(item),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Hero(
+                tag: item.imagePath,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: SizedBox(width: 70, height: 70, child: _buildImage(item)),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.diseaseName, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Text(DateFormat('MMM dd, yyyy • hh:mm a').format(item.dateTime), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                child: Text('${(item.confidence * 100).toInt()}%', style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildImage(Prediction scan) {
-    if (scan.isAsset) {
-      return Image.asset(scan.imagePath, width: 60, height: 60, fit: BoxFit.cover);
-    } else if (scan.isNetwork || scan.imagePath.startsWith('http')) {
-      return Image.network(
-        scan.imagePath, 
-        width: 60, height: 60, fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(color: Colors.grey, width: 60, height: 60, child: const Icon(Icons.broken_image)),
-      );
-    } else {
-      return Image.file(File(scan.imagePath), width: 60, height: 60, fit: BoxFit.cover);
+    if (scan.isAsset) return Image.asset(scan.imagePath, fit: BoxFit.cover);
+    if (scan.isNetwork || scan.imagePath.startsWith('http')) {
+      return Image.network(scan.imagePath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image));
     }
+    final file = File(scan.imagePath);
+    return file.existsSync() ? Image.file(file, fit: BoxFit.cover) : const Icon(Icons.image_not_supported);
+  }
+
+  Future<void> _deleteSelected(AppProvider provider) async {
+    provider.deleteMultipleScans(_selectedItems.toList());
+    setState(() { _selectedItems.clear(); _isSelectionMode = false; });
+  }
+
+  Future<void> _deleteAll(AppProvider provider) async {
+    provider.deleteAllHistory();
+    setState(() { _selectedItems.clear(); _isSelectionMode = false; });
   }
 }

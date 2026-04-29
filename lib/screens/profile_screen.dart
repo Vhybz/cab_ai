@@ -33,21 +33,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLocationLoading = false;
 
   final List<String> _professions = [
-    'Crop Farmer',
-    'Commercial Farmer',
-    'Backyard Gardener',
-    'Agricultural Student',
-    'Extension Officer',
-    'Researcher',
-    'Other'
+    'Crop Farmer', 'Commercial Farmer', 'Backyard Gardener',
+    'Agricultural Student', 'Extension Officer', 'Researcher', 'Other'
   ];
 
   final List<String> _regions = [
-    'Ahafo (Goaso)', 'Ashanti (Kumasi)', 'Bono East (Techiman)', 'Brong Ahafo (Sunyani)',
-    'Central (Cape Coast)', 'Eastern (Koforidua)', 'Greater Accra (Accra)', 
-    'North East (Nalerigu)', 'Northern (Tamale)', 'Oti (Dambai)', 'Savannah (Damongo)',
-    'Upper East (Bolgatanga)', 'Upper West (Wa)', 'Volta (Ho)', 
-    'Western (Sekondi-Takoradi)', 'Western North (Sefwi Wiaso)'
+    'Ahafo', 'Ashanti', 'Bono East', 'Brong Ahafo', 'Central', 'Eastern', 
+    'Greater Accra', 'North East', 'Northern', 'Oti', 'Savannah',
+    'Upper East', 'Upper West', 'Volta', 'Western', 'Western North'
   ];
 
   @override
@@ -70,7 +63,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _surnameController.text = profile['surname'] ?? '';
           _phoneController.text = profile['phone_number'] ?? '';
           _dobController.text = profile['dob'] ?? '';
-          
           _selectedRegion = _regions.contains(profile['region']) ? profile['region'] : null;
           _selectedProfession = _professions.contains(profile['profession']) ? profile['profession'] : null;
           _selectedGender = profile['gender'];
@@ -80,7 +72,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('Error loading profile: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -102,61 +93,293 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final provider = Provider.of<AppProvider>(context, listen: false);
         await provider.updateAvatar(File(pickedFile.path));
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo updated!')));
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       } finally {
         setState(() => _isLoading = false);
       }
     }
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    DateTime initialDate = DateTime.now().subtract(const Duration(days: 365 * 20));
-    if (_dobController.text.isNotEmpty) {
-      try {
-        initialDate = DateFormat('yyyy-MM-dd').parse(_dobController.text);
-      } catch (e) {}
-    }
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final provider = Provider.of<AppProvider>(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(1940),
-      lastDate: DateTime.now(),
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              _buildSliverAppBar(context, colorScheme, provider, isDark),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        _buildStatsRow(provider, colorScheme, isDark),
+                        const SizedBox(height: 32),
+                        if (!_isEditing) _buildViewMode(theme, colorScheme, provider, isDark)
+                        else _buildEditMode(isDark, theme, colorScheme),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
     );
-    if (picked != null) {
-      setState(() {
-        _dobController.text = DateFormat('yyyy-MM-dd').format(picked);
-      });
-    }
   }
 
-  Future<void> _useCurrentLocation() async {
-    setState(() => _isLocationLoading = true);
-    try {
-      final provider = Provider.of<AppProvider>(context, listen: false);
-      await provider.useCurrentLocation();
-      setState(() {
-        final detected = provider.locationName;
-        _selectedRegion = _regions.firstWhere(
-          (r) => r.toLowerCase().contains(detected.toLowerCase()),
-          orElse: () => _selectedRegion ?? _regions[1]
-        );
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location updated to: ${provider.locationName}')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting location: $e')),
-        );
-      }
-    } finally {
-      setState(() => _isLocationLoading = false);
-    }
+  Widget _buildSliverAppBar(BuildContext context, ColorScheme colorScheme, AppProvider provider, bool isDark) {
+    return SliverAppBar(
+      expandedHeight: 340,
+      pinned: true,
+      backgroundColor: isDark ? const Color(0xFF1B2E1C) : colorScheme.primary,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded),
+        onPressed: () => Navigator.pop(context),
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(_isEditing ? Icons.close_rounded : Icons.edit_note_rounded, size: 28),
+          onPressed: () => setState(() {
+            _isEditing = !_isEditing;
+            if (!_isEditing) _loadUserProfile();
+          }),
+        ),
+      ],
+      flexibleSpace: FlexibleSpaceBar(
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                isDark ? const Color(0xFF1B2E1C) : colorScheme.primary,
+                isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
+              ],
+              stops: const [0.6, 1.0],
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(height: 40),
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white24, width: 2)),
+                    child: CircleAvatar(
+                      radius: 65,
+                      backgroundColor: Colors.white10,
+                      backgroundImage: provider.avatarUrl != null ? NetworkImage(provider.avatarUrl!) : null,
+                      child: provider.avatarUrl == null ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
+                    ),
+                  ),
+                  if (_isEditing)
+                    GestureDetector(
+                      onTap: _pickAvatar,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: colorScheme.secondary, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+                        child: const Icon(Icons.camera_alt_rounded, size: 18, color: Colors.white),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '${_firstNameController.text} ${_surnameController.text}',
+                style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+              ),
+              Text(
+                _selectedProfession ?? 'Dedicated Farmer',
+                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsRow(AppProvider provider, ColorScheme colorScheme, bool isDark) {
+    return Row(
+      children: [
+        _buildStatCard('Total Scans', provider.history.length.toString(), Icons.qr_code_scanner_rounded, Colors.blue, isDark),
+        const SizedBox(width: 12),
+        _buildStatCard('Schedules', provider.schedules.length.toString(), Icons.event_available_rounded, Colors.orange, isDark),
+        const SizedBox(width: 12),
+        _buildStatCard('Rank', provider.isGuest ? 'Free' : 'Pro', Icons.stars_rounded, Colors.amber, isDark),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, IconData icon, Color color, bool isDark) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 8),
+            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewMode(ThemeData theme, ColorScheme colorScheme, AppProvider provider, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('PERSONAL INFORMATION'),
+        _buildInfoCard(isDark, [
+          _buildInfoRow(Icons.email_rounded, 'Email Address', _userEmail ?? 'Not Set', isDark),
+          _buildInfoRow(Icons.phone_iphone_rounded, 'Phone Number', _phoneController.text, isDark),
+          _buildInfoRow(Icons.location_on_rounded, 'Region / Location', _selectedRegion ?? 'Not Set', isDark),
+        ]),
+        const SizedBox(height: 24),
+        _buildSectionHeader('FARMING PROFILE'),
+        _buildInfoCard(isDark, [
+          _buildInfoRow(Icons.work_rounded, 'Profession', _selectedProfession ?? 'Not Set', isDark),
+          _buildInfoRow(Icons.calendar_month_rounded, 'Birth Date', _dobController.text, isDark),
+          _buildInfoRow(Icons.wc_rounded, 'Gender', _selectedGender ?? 'Not Set', isDark),
+        ]),
+        const SizedBox(height: 40),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton.icon(
+            onPressed: () { provider.signOut(); Navigator.pop(context); },
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+            label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w900)),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.all(20),
+              backgroundColor: Colors.redAccent.withOpacity(0.1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 12),
+      child: Text(title, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+    );
+  }
+
+  Widget _buildInfoCard(bool isDark, List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: Colors.green, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                Text(value.isEmpty ? 'Not Provided' : value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditMode(bool isDark, ThemeData theme, ColorScheme colorScheme) {
+    return Column(
+      children: [
+        _buildTextField('First Name', _firstNameController, Icons.person_outline, isDark),
+        const SizedBox(height: 16),
+        _buildTextField('Surname', _surnameController, Icons.badge_outlined, isDark),
+        const SizedBox(height: 16),
+        _buildTextField('Phone Number', _phoneController, Icons.phone_android_rounded, isDark, isPhone: true),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          value: _selectedRegion,
+          decoration: _inputDecoration('Region / Location', Icons.location_on_outlined, isDark),
+          items: _regions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+          onChanged: (v) => setState(() => _selectedRegion = v),
+          validator: (v) => v == null ? 'Required' : null,
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          value: _selectedProfession,
+          decoration: _inputDecoration('Profession', Icons.work_outline, isDark),
+          items: _professions.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+          onChanged: (v) => setState(() => _selectedProfession = v),
+        ),
+        const SizedBox(height: 32),
+        ElevatedButton(
+          onPressed: _saveProfile,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: colorScheme.primary,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(double.infinity, 60),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            elevation: 4,
+          ),
+          child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller, IconData icon, bool isDark, {bool isPhone = false}) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
+      decoration: _inputDecoration(label, icon, isDark),
+      validator: (v) => v!.isEmpty ? 'Required' : null,
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, IconData icon, bool isDark) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: Colors.green),
+      filled: true,
+      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: Colors.grey.withOpacity(0.1))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: Colors.grey.withOpacity(0.1))),
+    );
   }
 
   Future<void> _saveProfile() async {
@@ -172,348 +395,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           dob: _dobController.text,
           gender: _selectedGender ?? '',
         );
-        
-        if (mounted) {
-          final provider = Provider.of<AppProvider>(context, listen: false);
-          provider.setUserName('${_firstNameController.text} ${_surnameController.text}');
-          
-          setState(() {
-            _isEditing = false;
-            _isLoading = false;
-          });
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile updated successfully!')),
-          );
-        }
+        final provider = Provider.of<AppProvider>(context, listen: false);
+        provider.setUserName('${_firstNameController.text} ${_surnameController.text}');
+        setState(() { _isEditing = false; _isLoading = false; });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile Updated!')));
       } catch (e) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating profile: $e')),
-          );
-        }
+        setState(() => _isLoading = false);
       }
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final provider = Provider.of<AppProvider>(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        title: const Text('Farmer Profile', style: TextStyle(fontWeight: FontWeight.bold)),
-        elevation: 0,
-        backgroundColor: isDark ? const Color(0xFF1E1E1E) : colorScheme.primary,
-        foregroundColor: Colors.white,
-        actions: [
-          if (!_isLoading)
-            IconButton(
-              icon: Icon(_isEditing ? Icons.close_rounded : Icons.edit_rounded),
-              onPressed: () => setState(() {
-                _isEditing = !_isEditing;
-                if (!_isEditing) _loadUserProfile();
-              }),
-            ),
-        ],
-      ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              children: [
-                _buildHeaderBackground(colorScheme, provider, isDark, theme),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 20),
-                        if (!_isEditing) ...[
-                          _buildViewMode(theme, colorScheme, provider, isDark),
-                        ] else ...[
-                          _buildEditMode(isDark, theme),
-                        ],
-                        const SizedBox(height: 40),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  Widget _buildHeaderBackground(ColorScheme colorScheme, AppProvider provider, bool isDark, ThemeData theme) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : colorScheme.primary,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(40),
-          bottomRight: Radius.circular(40),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
-      child: Column(
-        children: [
-          _buildProfileHeader(colorScheme, provider),
-          if (!_isEditing) ...[
-            const SizedBox(height: 16),
-            Text(
-              '${_firstNameController.text} ${_surnameController.text}',
-              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _selectedProfession ?? 'Farmer',
-              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileHeader(ColorScheme colorScheme, AppProvider provider) {
-    return Stack(
-      alignment: Alignment.bottomRight,
-      children: [
-        GestureDetector(
-          onTap: _isEditing ? _pickAvatar : null,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white24,
-            ),
-            child: CircleAvatar(
-              radius: 65,
-              backgroundColor: Colors.white10,
-              backgroundImage: provider.avatarUrl != null ? NetworkImage(provider.avatarUrl!) : null,
-              child: provider.avatarUrl == null 
-                ? const Icon(Icons.person_rounded, size: 80, color: Colors.white70)
-                : null,
-            ),
-          ),
-        ),
-        if (_isEditing)
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle),
-            child: const Icon(Icons.camera_alt_rounded, size: 20, color: Colors.black87),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildViewMode(ThemeData theme, ColorScheme colorScheme, AppProvider provider, bool isDark) {
-    return Column(
-      children: [
-        _buildInfoCard(isDark, [
-          _buildInfoRow(Icons.email_outlined, 'Email', _userEmail ?? 'Not Set', isDark),
-          _buildDivider(isDark),
-          _buildInfoRow(Icons.wc_rounded, 'Gender', _selectedGender ?? 'Not Set', isDark),
-          _buildDivider(isDark),
-          _buildInfoRow(Icons.phone_rounded, 'Contact', _phoneController.text, isDark),
-          _buildDivider(isDark),
-          _buildInfoRow(Icons.cake_rounded, 'Date of Birth', _dobController.text, isDark),
-          _buildDivider(isDark),
-          _buildInfoRow(Icons.location_on_rounded, 'Region', _selectedRegion ?? 'Not Set', isDark),
-        ]),
-        const SizedBox(height: 32),
-        ElevatedButton.icon(
-          onPressed: () {
-            provider.signOut();
-            Navigator.pop(context);
-          },
-          icon: const Icon(Icons.logout_rounded),
-          label: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.bold)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isDark ? Colors.red.withOpacity(0.2) : Colors.red[50],
-            foregroundColor: Colors.redAccent,
-            elevation: 0,
-            minimumSize: const Size(double.infinity, 56),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEditMode(bool isDark, ThemeData theme) {
-    return Column(
-      children: [
-        _buildTextField('First Name', _firstNameController, Icons.person_outline, isDark),
-        const SizedBox(height: 16),
-        _buildTextField('Surname', _surnameController, Icons.badge_outlined, isDark),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _dobController,
-          readOnly: true,
-          onTap: () => _selectDate(context),
-          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-          decoration: _inputDecoration('Date of Birth', Icons.calendar_today_outlined, isDark),
-          validator: (v) => v!.isEmpty ? 'Required' : null,
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(10),
-          ],
-          decoration: _inputDecoration('Phone Number', Icons.phone_android_rounded, isDark),
-          validator: (v) {
-            if (v!.isEmpty) return 'Required';
-            if (v.length < 10) return 'Must be 10 digits';
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _selectedProfession,
-          isExpanded: true,
-          dropdownColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
-          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-          decoration: _inputDecoration('Profession', Icons.work_outline, isDark),
-          items: _professions.map((p) => DropdownMenuItem(value: p, child: Text(p, overflow: TextOverflow.ellipsis))).toList(),
-          onChanged: (v) => setState(() => _selectedProfession = v),
-          validator: (v) => v == null ? 'Required' : null,
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _selectedRegion,
-                isExpanded: true,
-                dropdownColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
-                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                decoration: _inputDecoration('Region', Icons.map_outlined, isDark),
-                items: _regions.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))).toList(),
-                onChanged: (v) => setState(() => _selectedRegion = v),
-                validator: (v) => v == null ? 'Required' : null,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              height: 56,
-              width: 56,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.greenAccent.withOpacity(0.1) : Colors.green[50],
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: isDark ? Colors.greenAccent.withOpacity(0.3) : Colors.green.withOpacity(0.3)),
-              ),
-              child: IconButton(
-                onPressed: _isLocationLoading ? null : _useCurrentLocation,
-                icon: _isLocationLoading 
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Icon(Icons.my_location_rounded, color: isDark ? Colors.greenAccent : Colors.green),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
-        FilledButton.icon(
-          onPressed: _saveProfile,
-          icon: const Icon(Icons.save_rounded),
-          label: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size(double.infinity, 56),
-            backgroundColor: isDark ? Colors.greenAccent : null,
-            foregroundColor: isDark ? Colors.black : null,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoCard(bool isDark, List<Widget> children) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.4 : 0.03), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: isDark ? Colors.greenAccent : Colors.green, size: 22),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
-                const SizedBox(height: 2),
-                Text(
-                  value.isEmpty ? 'Not Set' : value,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDivider(bool isDark) {
-    return Divider(height: 1, indent: 70, color: isDark ? Colors.white10 : Colors.grey[200]);
-  }
-
-  Widget _buildTextField(String label, TextEditingController controller, IconData icon, bool isDark) {
-    return TextFormField(
-      controller: controller,
-      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]'))],
-      decoration: _inputDecoration(label, icon, isDark),
-      validator: (v) => v!.isEmpty ? 'Required' : null,
-    );
-  }
-
-  InputDecoration _inputDecoration(String label, IconData icon, bool isDark) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: TextStyle(color: isDark ? Colors.grey : Colors.black54),
-      prefixIcon: Icon(icon, color: isDark ? Colors.grey : Colors.green),
-      filled: true,
-      fillColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: isDark ? BorderSide.none : BorderSide(color: Colors.grey.shade300),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: isDark ? BorderSide.none : BorderSide(color: Colors.grey.shade300),
-      ),
-    );
   }
 }

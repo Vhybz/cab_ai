@@ -23,9 +23,15 @@
     </queries>
 
     <application
-        android:label="cabage_ai"
+        android:label="cabby"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
+
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -39,7 +45,6 @@
               android:resource="@style/NormalTheme"
               />
 
-            <!-- Custom Scheme Intent Filter -->
             <intent-filter android:label="cabage_ai_scheme">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -47,7 +52,6 @@
                 <data android:scheme="io.supabase.cabageai" />
             </intent-filter>
 
-            <!-- App Links Intent Filter (HTTPS) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -70,7 +71,6 @@ class AppProvider with ChangeNotifier {
 
   String get firstName {
     if (_userName == 'Guest' || _userName.isEmpty) return 'Guest';
-    // Handle names like "John Doe" or metadata structured names
     return _userName.split(' ').first;
   }
 
@@ -269,12 +269,12 @@ class AppProvider with ChangeNotifier {
       'twi_treatment': 'Ma mframa mbɔ mu yiye, mma nsuo nka nhaban no so pii, na fa nnuru a ɛfata gu so.',
       'image': 'assets/images/c3.jpg'
     },
-    'White Rust': {
-      'description': 'A disease caused by Albugo candida, appearing as white, chalky pustules on the undersides of leaves.',
-      'treatment': 'Remove infected leaves, improve drainage, and use resistant varieties or fungicides.',
-      'twi_name': 'White Rust Yadeɛ',
-      'twi_description': 'Yadeɛ yi ma nhaban no ase yɛ mfutuo fitaa te sɛ nkanyan.',
-      'twi_treatment': 'Tu nhaban a ayɛ yadeɛ no gu, hwɛ ma nsuo nkɔ mu yiye, na fa nnuru a ɛfata gu so.',
+    'Alternaria Spot': {
+      'description': 'Caused by Alternaria fungi, resulting in small, dark spots that often develop a target-like appearance.',
+      'treatment': 'Practice crop rotation, use clean seed, and apply appropriate fungicides if severe.',
+      'twi_name': 'Alternaria Spot Yadeɛ',
+      'twi_description': 'Yadeɛ yi firi mmoawa a ɛma nhaban no so yɛ ntokuro ntokuro kɔkɔɔ anaa tuntum.',
+      'twi_treatment': 'Sesa nnɔbae no, fa aba a ho tɛ yɛ adwuma, na fa nnuru a ɛfata gu so.',
       'image': 'assets/images/c4.jpg'
     },
     'Healthy': {
@@ -287,40 +287,92 @@ class AppProvider with ChangeNotifier {
     },
   };
 
-  Future<void> pickImage(ImageSource source) async {
-    final XFile? pickedFile = await _picker.pickImage(source: source);
-    
-    if (pickedFile != null) {
-      _isLoading = true;
-      _currentPrediction = null;
-      _analysisMessage = 'SCANNING...';
-      notifyListeners();
+  Future<File?> _cropImage(String path, BuildContext context) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-      try {
-        await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: path,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: _language == 'Twi' ? 'Twia mfonini no' : 'Focus on the Leaf',
+            toolbarColor: colorScheme.primary,
+            toolbarWidgetColor: Colors.white,
+            activeControlsWidgetColor: colorScheme.secondary,
+            backgroundColor: theme.scaffoldBackgroundColor,
+            statusBarColor: colorScheme.primary,
+            showCropGrid: true,
+            initAspectRatio: CropAspectRatioPreset.original,
+            lockAspectRatio: false,
+            aspectRatioPresets: [
+              CropAspectRatioPreset.original,
+              CropAspectRatioPreset.square,
+              CropAspectRatioPreset.ratio3x2,
+              CropAspectRatioPreset.ratio4x3,
+              CropAspectRatioPreset.ratio16x9
+            ],
+          ),
+          IOSUiSettings(
+            title: _language == 'Twi' ? 'Twia mfonini no' : 'Focus on the Leaf',
+            aspectRatioPresets: [
+              CropAspectRatioPreset.original,
+              CropAspectRatioPreset.square,
+              CropAspectRatioPreset.ratio3x2,
+              CropAspectRatioPreset.ratio4x3,
+              CropAspectRatioPreset.ratio16x9
+            ],
+          ),
+        ],
+      );
+      if (croppedFile != null) {
+        return File(croppedFile.path);
+      }
+    } catch (e) {
+      debugPrint('Cropping error: $e');
+    }
+    return null;
+  }
+
+  Future<void> pickImage(ImageSource source, BuildContext context) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: source);
+      
+      if (pickedFile != null) {
+        // Essential delay to prevent race condition on some Android devices
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        final croppedFile = await _cropImage(pickedFile.path, context);
+        if (croppedFile == null) return; 
+
+        _isLoading = true;
+        _currentPrediction = null;
+        _analysisMessage = 'SCANNING...';
+        notifyListeners();
+
+        await Future.delayed(const Duration(milliseconds: 500));
         _analysisMessage = 'EXTRACTING FEATURES...';
         notifyListeners();
         
-        final result = await _tfLiteService.classifyImage(pickedFile.path);
+        final result = await _tfLiteService.classifyImage(croppedFile.path);
         
-        await Future.delayed(const Duration(milliseconds: 600));
+        await Future.delayed(const Duration(milliseconds: 500));
         _analysisMessage = 'MODEL DECIDING...';
         notifyListeners();
 
-        if (result != null) {
-          final directory = await getApplicationDocumentsDirectory();
-          final fileName = path.basename(pickedFile.path);
-          final savedImage = await File(pickedFile.path).copy('${directory.path}/$fileName');
-          
-          _selectedImage = savedImage;
+        final directory = await getApplicationDocumentsDirectory();
+        final fileName = 'scan_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final savedImage = await croppedFile.copy('${directory.path}/$fileName');
+        _selectedImage = savedImage;
 
+        if (result != null) {
           if (result['isLeaf'] == false) {
             _currentPrediction = Prediction(
               diseaseName: _language == 'Twi' ? 'Ɛnyɛ nhaban' : 'Not a Leaf',
               confidence: result['confidence'],
               description: _language == 'Twi' 
-                  ? 'Mfonini a woyiiɛ no nsɛ kabeji nhaban. Yɛpa wo kyɛw scan kabeji nhaban a ɛfata. Yɛn AI no hu kabeji nhaban nko ara mprempren.' 
-                  : 'The image captured does not look like a cabbage leaf. Please try again with a clear photo of a cabbage leaf.',
+                  ? 'Mfonini a woyiiɛ no nsɛ kabeji nhaban anaa ɛnyɛ fann. Yɛpa wo kyɛw scan kabeji nhaban a ɛfata na fann. Yɛn AI no hu kabeji nhaban nko ara mprempren.' 
+                  : 'The image captured does not look like a cabbage leaf or is not clear enough. Please try again with a clear photo of a cabbage leaf.',
               treatment: _language == 'Twi' ? 'Sane yɛ mfonini foforɔ.' : 'Please retake the photo.',
               imagePath: savedImage.path,
               dateTime: DateTime.now(),
@@ -343,32 +395,48 @@ class AppProvider with ChangeNotifier {
               isLeaf: true,
             );
             
-            // Add to local history immediately
             _history.insert(0, _currentPrediction!);
             _saveHistory();
             
-            // Sync with Supabase if logged in
             if (!isGuest) {
               await _supabaseService.saveScan(_currentPrediction!, savedImage);
-              // Refresh history from cloud to get the real network path/id if needed
               await syncWithCloud();
             }
             _checkAndNotifyAnalytics();
           }
+        } else {
+          _currentPrediction = Prediction(
+            diseaseName: _language == 'Twi' ? 'Mfomsoɔ' : 'Analysis Error',
+            confidence: 0.0,
+            description: _language == 'Twi' ? 'Yɛantumi anhunu yadeɛ no. Yɛpa wo kyɛw sane bɔ mmɔden.' : 'We could not analyze the image. Please try again.',
+            treatment: _language == 'Twi' ? 'Sane yɛ mfonini foforɔ.' : 'Please retake the photo.',
+            imagePath: savedImage.path,
+            dateTime: DateTime.now(),
+            isAsset: false,
+          );
         }
-      } catch (e) {
-        debugPrint('Error during classification: $e');
-      } finally {
-        _isLoading = false;
-        notifyListeners();
       }
+    } catch (e) {
+      debugPrint('Error during selection/classification: $e');
+      _currentPrediction = Prediction(
+        diseaseName: 'Error',
+        confidence: 0.0,
+        description: 'A critical error occurred: $e',
+        treatment: 'Please restart the app or try again.',
+        imagePath: '',
+        dateTime: DateTime.now(),
+        isAsset: false,
+      );
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
   void _checkAndNotifyAnalytics() {
     if (!_notificationsEnabled) return;
     if (_history.length >= 3) {
-      int healthyCount = _history.where((s) => s.diseaseName.contains('Healthy') || s.diseaseName.contains('Nhyehy')).length;
+      int healthyCount = _history.where((s) => s.diseaseName.toLowerCase().contains('healthy') || s.diseaseName.contains('Nhyehy')).length;
       int diseasedCount = _history.length - healthyCount;
       
       String summary = "You've completed ${_history.length} scans. $healthyCount healthy, $diseasedCount diseased.";
@@ -378,7 +446,7 @@ class AppProvider with ChangeNotifier {
       
       _notificationService.showInstantNotification(
         100,
-        _language == 'Twi' ? 'Nkabom Nhwehwɛmu' : 'Farm Health Summary',
+        _language == 'Twi' ? 'Nkabom NhwehwƐmu' : 'Farm Health Summary',
         summary
       );
     }
@@ -466,15 +534,12 @@ class AppProvider with ChangeNotifier {
   }
 
   Future<void> deleteScan(Prediction prediction) async {
-    // 1. Remove from local list
     _history.removeWhere((item) => item.dateTime == prediction.dateTime && item.imagePath == prediction.imagePath);
     
-    // 2. Delete from Supabase Database and Storage
     if (!isGuest && (prediction.isNetwork || prediction.imagePath.startsWith('http'))) {
       await _supabaseService.deleteScan(prediction.imagePath);
     }
 
-    // 3. Delete local file from device storage
     if (!prediction.isAsset) {
       try {
         final file = File(prediction.imagePath);
@@ -486,7 +551,6 @@ class AppProvider with ChangeNotifier {
       }
     }
     
-    // 4. Update local Hive box
     _saveHistory();
     notifyListeners();
   }
@@ -604,7 +668,7 @@ class AppProvider with ChangeNotifier {
       'No tasks scheduled.': 'Hyehyɛɛ biara nni hɔ.',
       'Scanning': 'NhwehwƐmu',
       'Watering': 'Nsuo gu',
-      'Pruning': 'Nhyehyɛɛ',
+      'Pruning': 'Nhyehyɛe',
       'Fertilizing': 'Duane gu',
       'Pest Control': 'Mmoawa kum',
       'Invalid Image': 'Mfonini no nyɛ papa',
@@ -654,7 +718,7 @@ class AppProvider with ChangeNotifier {
       'Click to plan it below.': 'Pia ase ha na hyehyɛ.',
       'Scanning': 'NhwehwƐmu',
       'Watering': 'Nsuo gu',
-      'Pruning': 'Nhyehyɛɛ',
+      'Pruning': 'Nhyehyɛe',
       'Fertilizing': 'Duane gu',
       'Pest Control': 'Mmoawa kum',
       'Use AI to check for diseases early.': 'Fa AI hwehwɛ yadeɛ mu ntɛm.',
@@ -695,7 +759,7 @@ class AppProvider with ChangeNotifier {
       if (latestDisease.contains('Black Rot') && (day.weekday == DateTime.tuesday || day.weekday == DateTime.friday)) {
         return _language == 'Twi' ? 'Wuo Aduane ma Black Rot' : 'Copper Fungicide Spray';
       }
-      if (latestDisease.contains('Downy Mildew') && day.weekday == DateTime.monday) {
+      if (latestDisease.contains('Downy') && day.weekday == DateTime.monday) {
         return _language == 'Twi' ? 'Hwɛ nhaban no ase' : 'Check Leaf Undersides';
       }
     }

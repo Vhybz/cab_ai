@@ -22,7 +22,7 @@ android {
     defaultConfig {
         applicationId = "com.example.cabage_ai"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
@@ -41,6 +41,6 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
-    // Keep this for Google Sign In functionality
+    implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 }

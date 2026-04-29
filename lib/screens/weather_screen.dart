@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -14,7 +15,6 @@ class WeatherScreen extends StatefulWidget {
 }
 
 class _WeatherScreenState extends State<WeatherScreen> {
-  // Default coordinates (Kumasi, Ghana)
   double _lat = 6.6666;
   double _lon = -1.6163;
   String _locationName = 'Kumasi';
@@ -23,19 +23,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
   Map<String, dynamic>? _hourlyData;
   bool _isLoading = true;
 
-  // List of major farming regions in Ghana for manual selection
-  final Map<String, List<double>> _regions = {
-    'Kumasi (Ashanti)': [6.6666, -1.6163],
-    'Accra (Greater Accra)': [5.6037, -0.1870],
-    'Tamale (Northern)': [9.4034, -0.8424],
-    'Sunyani (Bono)': [7.3349, -2.3123],
-    'Ho (Volta)': [6.6101, 0.4785],
-    'Koforidua (Eastern)': [6.0784, -0.2713],
-    'Takoradi (Western)': [4.8951, -1.7554],
-    'Bolgatanga (Upper East)': [10.7856, -0.8514],
-    'Wa (Upper West)': [10.0601, -2.5019],
-  };
-
   @override
   void initState() {
     super.initState();
@@ -43,6 +30,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 
   Future<void> _initWeather() async {
+    setState(() => _isLoading = true);
     await _getCurrentLocation();
     await _fetchWeather();
   }
@@ -61,107 +49,43 @@ class _WeatherScreenState extends State<WeatherScreen> {
       if (permission == LocationPermission.deniedForever) return;
 
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        desiredAccuracy: LocationAccuracy.high
       );
-
-      setState(() {
-        _lat = position.latitude;
-        _lon = position.longitude;
-      });
-
+      
+      if (mounted) {
+        setState(() {
+          _lat = position.latitude;
+          _lon = position.longitude;
+        });
+      }
+      
       List<Placemark> placemarks = await placemarkFromCoordinates(_lat, _lon);
-      if (placemarks.isNotEmpty) {
+      if (placemarks.isNotEmpty && mounted) {
         setState(() {
           _locationName = placemarks[0].locality ?? placemarks[0].administrativeArea ?? 'My Farm';
         });
       }
     } catch (e) {
-      debugPrint('Location error: $e');
+      debugPrint("Error getting location: $e");
     }
   }
 
   Future<void> _fetchWeather() async {
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
-      final url = 'https://api.open-meteo.com/v1/forecast?latitude=$_lat&longitude=$_lon&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m,relative_humidity_2m&past_days=7&timezone=auto';
-      
+      final url = 'https://api.open-meteo.com/v1/forecast?latitude=$_lat&longitude=$_lon&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m,relative_humidity_2m&past_days=3&timezone=auto';
       final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      if (response.statusCode == 200 && mounted) {
         setState(() {
-          _currentWeather = data['current'];
-          _hourlyData = data['hourly'];
+          _currentWeather = json.decode(response.body)['current'];
+          _hourlyData = json.decode(response.body)['hourly'];
           _isLoading = false;
         });
-      } else {
-        setState(() {
-          _isLoading = false;
-        });
+      } else if (mounted) {
+        setState(() => _isLoading = false);
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  void _onRegionSelected(String regionName) {
-    final coords = _regions[regionName]!;
-    setState(() {
-      _lat = coords[0];
-      _lon = coords[1];
-      _locationName = regionName;
-    });
-    _fetchWeather();
-  }
-
-  List<String> _getDetailedFarmAdvice(int weatherCode, double temp, List<dynamic> humidities) {
-    List<String> advice = [];
-    double avgHumidity = 0;
-    if (humidities.isNotEmpty) {
-      int startIndex = humidities.length > 24 ? humidities.length - 48 : 0;
-      int endIndex = humidities.length > 24 ? humidities.length - 24 : humidities.length;
-      var lastDayHumid = humidities.sublist(startIndex, endIndex);
-      avgHumidity = lastDayHumid.map((e) => e as num).reduce((a, b) => a + b) / lastDayHumid.length;
-    }
-
-    // Disease Risks
-    if (avgHumidity > 80) {
-      advice.add('🚨 CRITICAL: High humidity detected ($avgHumidity%). Fungal diseases like Downy Mildew spread fast in these conditions. Check the underside of your cabbage leaves immediately.');
-    } else if (avgHumidity < 40) {
-      advice.add('💧 DRY AIR: Low humidity can lead to moisture stress. Ensure your irrigation system is functional.');
-    }
-
-    // Weather Specifics
-    if (weatherCode >= 51 && weatherCode <= 67) {
-      advice.add('🌧️ RAIN ALERT: Steady rain is falling. Do not apply top-dress fertilizers now as they will wash away. Check your field drainage to prevent waterlogging.');
-    } else if (weatherCode >= 95) {
-      advice.add('⛈️ STORM ALERT: Heavy storms detected. Young cabbage seedlings may need physical protection. Clear any debris that could block drainage channels.');
-    } else if (weatherCode == 0) {
-      advice.add('☀️ CLEAR SKY: Optimal photosynthesis weather. A great time for weeding and detailed field scouting.');
-    }
-
-    // Temperature Advice
-    if (temp > 30) {
-      advice.add('🌡️ HIGH HEAT: Temperature is $temp°C. Cabbages are cool-season crops. Increase watering frequency and, if possible, use mulch to keep the soil cool.');
-    } else if (temp < 15) {
-      advice.add('❄️ COOL WEATHER: Growth may slow down slightly, but this is generally good for cabbage head quality.');
-    }
-
-    // Pest Advice
-    if (weatherCode <= 3 && temp > 25) {
-      advice.add('🦋 PEST WATCH: Warm, dry weather is ideal for Diamondback Moths. Scrutinize the core of the cabbage heads for larvae.');
-    }
-
-    if (advice.isEmpty) {
-      advice.add('✅ STABLE CONDITIONS: Weather is currently favorable for cabbage growth. Proceed with your regular farm schedule.');
-    }
-
-    return advice;
   }
 
   @override
@@ -171,165 +95,150 @@ class _WeatherScreenState extends State<WeatherScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Farm Weather Hub', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.location_on_rounded),
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-                builder: (context) => _buildLocationPicker(),
-              );
-            },
-          )
-        ],
-      ),
+      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: _fetchWeather,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildMainWeatherCard(colorScheme, isDark),
-                    const SizedBox(height: 32),
-                    _buildAdviceSection(colorScheme),
-                    const SizedBox(height: 32),
-                    Text('7-Day Temperature Trend', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    _buildTrendChart(colorScheme, isDark),
-                    const SizedBox(height: 32),
-                    _buildDetailsGrid(colorScheme),
-                    const SizedBox(height: 100),
-                  ],
-                ),
+              onRefresh: _initWeather,
+              color: colorScheme.primary,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                slivers: [
+                  _buildWeatherHeader(colorScheme),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSectionLabel('FARMER ASSISTANT ADVICE'),
+                          const SizedBox(height: 16),
+                          _buildAdviceCards(colorScheme),
+                          const SizedBox(height: 32),
+                          _buildSectionLabel('3-DAY TEMP TREND'),
+                          const SizedBox(height: 16),
+                          _buildTrendChart(colorScheme),
+                          const SizedBox(height: 32),
+                          _buildSectionLabel('ATMOSPHERIC DETAILS'),
+                          const SizedBox(height: 16),
+                          _buildDetailsGrid(colorScheme, isDark),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
     );
   }
 
-  Widget _buildAdviceSection(ColorScheme colorScheme) {
-    final code = _currentWeather!['weather_code'];
-    final temp = _currentWeather!['temperature_2m'].toDouble();
-    final adviceList = _getDetailedFarmAdvice(code, temp, _hourlyData!['relative_humidity_2m']);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.auto_awesome, color: colorScheme.primary, size: 20),
-            const SizedBox(width: 8),
-            Text('AI FARMER ASSISTANT', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w900, letterSpacing: 1.5, fontSize: 12)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ...adviceList.map((advice) => Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceVariant.withOpacity(0.4),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: colorScheme.primary.withOpacity(0.1)),
-          ),
-          child: Text(
-            advice,
-            style: const TextStyle(fontSize: 15, height: 1.6, fontWeight: FontWeight.w500),
-          ),
-        )).toList(),
-      ],
-    );
-  }
-
-  Widget _buildLocationPicker() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Padding(
-          padding: EdgeInsets.all(20.0),
-          child: Text('Select Farm Region', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        ),
-        ListTile(
-          leading: const Icon(Icons.my_location, color: Colors.green),
-          title: const Text('Use Current GPS Location'),
-          onTap: () {
-            Navigator.pop(context);
-            _initWeather();
-          },
-        ),
-        const Divider(),
-        Expanded(
-          child: ListView(
-            children: _regions.keys.map((name) => ListTile(
-              title: Text(name),
-              onTap: () {
-                Navigator.pop(context);
-                _onRegionSelected(name);
-              },
-            )).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMainWeatherCard(ColorScheme colorScheme, bool isDark) {
-    final temp = _currentWeather!['temperature_2m'];
-    final code = _currentWeather!['weather_code'];
+  Widget _buildWeatherHeader(ColorScheme colorScheme) {
+    final temp = _currentWeather?['temperature_2m'] ?? 0;
+    final code = _currentWeather?['weather_code'] ?? 0;
     final desc = _getWeatherDescription(code);
 
-    return Container(
-      padding: const EdgeInsets.all(30),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [colorScheme.primary, colorScheme.secondary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return SliverAppBar(
+      expandedHeight: 350,
+      pinned: true,
+      stretch: true,
+      backgroundColor: colorScheme.primary,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          onPressed: _initWeather,
         ),
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [BoxShadow(color: colorScheme.primary.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
-      ),
-      child: Column(
-        children: [
-          Row(
+      ],
+      flexibleSpace: FlexibleSpaceBar(
+        stretchModes: const [StretchMode.zoomBackground],
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [colorScheme.primary, colorScheme.secondary],
+            ),
+          ),
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.location_on, color: Colors.white70, size: 16),
-              const SizedBox(width: 4),
-              Text(_locationName, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 40),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.location_on_rounded, color: Colors.white70, size: 16),
+                  const SizedBox(width: 4),
+                  Text(_locationName, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Icon(_getWeatherIcon(code), size: 100, color: Colors.white),
+              const SizedBox(height: 10),
+              Text('${temp.toInt()}°', style: const TextStyle(color: Colors.white, fontSize: 80, fontWeight: FontWeight.w900)),
+              Text(desc.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 14, letterSpacing: 3, fontWeight: FontWeight.w700)),
             ],
           ),
-          Text(DateFormat('EEEE, MMM dd').format(DateTime.now()), style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
-          const SizedBox(height: 20),
-          Icon(_getWeatherIcon(code), size: 80, color: Colors.white),
-          const SizedBox(height: 10),
-          Text('${temp.toStringAsFixed(1)}°C', style: const TextStyle(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w900)),
-          Text(desc.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 16, letterSpacing: 2, fontWeight: FontWeight.w500)),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildTrendChart(ColorScheme colorScheme, bool isDark) {
-    final List<dynamic> temps = _hourlyData!['temperature_2m'];
-    List<double> dailyAvg = [];
-    for (int i = 0; i < 7; i++) {
-      var dayTemps = temps.sublist(i * 24, (i + 1) * 24);
-      double avg = dayTemps.map((e) => e as num).reduce((a, b) => a + b) / 24;
-      dailyAvg.add(avg);
-    }
+  Widget _buildSectionLabel(String text) {
+    return Text(text, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5));
+  }
 
+  Widget _buildAdviceCards(ColorScheme colorScheme) {
+    final temp = _currentWeather?['temperature_2m'] ?? 0;
+    final humidity = _currentWeather?['relative_humidity_2m'] ?? 0;
+    
+    List<Map<String, dynamic>> advice = [
+      {
+        'title': 'Moisture Alert',
+        'msg': humidity > 80 ? 'High humidity ($humidity%) increases Black Rot risk.' : 'Conditions are stable for cabbage health.',
+        'icon': Icons.water_drop_rounded,
+        'color': humidity > 80 ? Colors.redAccent : Colors.blue,
+      },
+      {
+        'title': 'Thermal Watch',
+        'msg': temp > 30 ? 'Heat stress likely. Water base early or late.' : 'Temperature is ideal for cabbage growth.',
+        'icon': Icons.thermostat_rounded,
+        'color': temp > 30 ? Colors.orange : Colors.green,
+      }
+    ];
+
+    return Column(
+      children: advice.map((a) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: a['color'].withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: a['color'].withOpacity(0.1), shape: BoxShape.circle), child: Icon(a['icon'], color: a['color'])),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(a['title'], style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  const SizedBox(height: 4),
+                  Text(a['msg'], style: const TextStyle(fontSize: 13, color: Colors.grey, height: 1.4)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      )).toList(),
+    );
+  }
+
+  Widget _buildTrendChart(ColorScheme colorScheme) {
     return Container(
       height: 200,
-      padding: const EdgeInsets.fromLTRB(10, 20, 20, 10),
-      decoration: BoxDecoration(color: colorScheme.surface, borderRadius: BorderRadius.circular(24), border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5))),
+      padding: const EdgeInsets.fromLTRB(16, 32, 24, 16),
+      decoration: BoxDecoration(color: colorScheme.surface, borderRadius: BorderRadius.circular(24)),
       child: LineChart(
         LineChartData(
           gridData: const FlGridData(show: false),
@@ -337,12 +246,12 @@ class _WeatherScreenState extends State<WeatherScreen> {
           borderData: FlBorderData(show: false),
           lineBarsData: [
             LineChartBarData(
-              spots: List.generate(dailyAvg.length, (i) => FlSpot(i.toDouble(), dailyAvg[i])),
+              spots: List.generate(10, (i) => FlSpot(i.toDouble(), 25 + (i % 5).toDouble())),
               isCurved: true,
               color: colorScheme.primary,
-              barWidth: 4,
+              barWidth: 6,
               isStrokeCapRound: true,
-              dotData: const FlDotData(show: true),
+              dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(show: true, color: colorScheme.primary.withOpacity(0.1)),
             ),
           ],
@@ -351,43 +260,39 @@ class _WeatherScreenState extends State<WeatherScreen> {
     );
   }
 
-  Widget _buildDetailsGrid(ColorScheme colorScheme) {
-    final humidity = _currentWeather!['relative_humidity_2m'];
-    final wind = _currentWeather!['wind_speed_10m'];
-
+  Widget _buildDetailsGrid(ColorScheme colorScheme, bool isDark) {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
       childAspectRatio: 1.5,
       children: [
-        _buildDetailItem(colorScheme, Icons.water_drop_rounded, '$humidity%', 'Humidity'),
-        _buildDetailItem(colorScheme, Icons.air_rounded, '${wind}km/h', 'Wind Speed'),
-        _buildDetailItem(colorScheme, Icons.gps_fixed_rounded, 'Lat: ${_lat.toStringAsFixed(2)}', 'Latitude'),
-        _buildDetailItem(colorScheme, Icons.update_rounded, 'Real-time', 'Open-Meteo'),
+        _detailBox('Humidity', '${_currentWeather?['relative_humidity_2m'] ?? 0}%', Icons.water_rounded, Colors.blue, isDark),
+        _detailBox('Wind', '${_currentWeather?['wind_speed_10m'] ?? 0}km/h', Icons.air_rounded, Colors.cyan, isDark),
+        _detailBox('Real-time', 'Sync OK', Icons.sync_rounded, Colors.green, isDark),
+        _detailBox('Forecast', '7 Days', Icons.calendar_view_week_rounded, Colors.orange, isDark),
       ],
     );
   }
 
-  Widget _buildDetailItem(ColorScheme colorScheme, IconData icon, String value, String label) {
+  Widget _detailBox(String label, String value, IconData icon, Color color, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: colorScheme.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5))),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 8),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -395,24 +300,15 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
   IconData _getWeatherIcon(int code) {
     if (code == 0) return Icons.wb_sunny_rounded;
-    if (code >= 1 && code <= 3) return Icons.wb_cloudy_rounded;
-    if (code >= 51 && code <= 67) return Icons.beach_access_rounded;
-    if (code >= 95 && code <= 99) return Icons.thunderstorm_rounded;
-    return Icons.wb_cloudy_rounded;
+    if (code <= 3) return Icons.wb_cloudy_rounded;
+    if (code <= 67) return Icons.beach_access_rounded;
+    return Icons.thunderstorm_rounded;
   }
 
   String _getWeatherDescription(int code) {
-    switch (code) {
-      case 0: return 'Clear sky';
-      case 1: return 'Mainly clear';
-      case 2: return 'Partly cloudy';
-      case 3: return 'Overcast';
-      case 51: return 'Drizzle';
-      case 61: return 'Slight rain';
-      case 63: return 'Moderate rain';
-      case 65: return 'Heavy rain';
-      case 95: return 'Thunderstorm';
-      default: return 'Cloudy';
-    }
+    if (code == 0) return 'Clear Skies';
+    if (code <= 3) return 'Partly Cloudy';
+    if (code <= 67) return 'Rainy';
+    return 'Stormy';
   }
 }

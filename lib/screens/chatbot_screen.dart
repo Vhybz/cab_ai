@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_provider.dart';
@@ -57,155 +59,198 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     final provider = context.watch<AppProvider>();
     final isTwi = provider.language == 'Twi';
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isTwi ? 'Kabeji Mmoawa' : 'Cabbage Assistant', 
-          style: const TextStyle(fontWeight: FontWeight.bold)),
-        elevation: 0,
-        backgroundColor: isDark ? theme.colorScheme.surface : Colors.green,
-        foregroundColor: Colors.white,
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF121212) : Colors.grey[50],
-        ),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: _messages.length + (provider.isChatLoading ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == _messages.length) {
-                    return _buildTypingIndicator(isDark);
-                  }
-
-                  final msg = _messages[index];
-                  final isBot = msg['role'] == 'bot';
-                  return _buildMessageBubble(msg['text']!, isBot, isDark, theme);
-                },
-              ),
+      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
+      body: Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                _buildSliverAppBar(colorScheme, isTwi),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (index == _messages.length) {
+                          return _buildTypingIndicator(isDark, colorScheme);
+                        }
+                        final msg = _messages[index];
+                        final isBot = msg['role'] == 'bot';
+                        return _buildMessageBubble(msg['text']!, isBot, isDark, colorScheme);
+                      },
+                      childCount: _messages.length + (provider.isChatLoading ? 1 : 0),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            _buildInputArea(provider, isTwi, isDark, theme),
-          ],
+          ),
+          _buildInputArea(provider, isTwi, isDark, colorScheme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSliverAppBar(ColorScheme colorScheme, bool isTwi) {
+    return SliverAppBar(
+      expandedHeight: 140,
+      pinned: true,
+      stretch: true,
+      backgroundColor: colorScheme.primary,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
+      ),
+      flexibleSpace: FlexibleSpaceBar(
+        centerTitle: true,
+        title: Text(
+          isTwi ? 'Kabeji Mmoawa' : 'Farm AI Assistant', 
+          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 18, letterSpacing: -0.5)
+        ),
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [colorScheme.primary, colorScheme.secondary],
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -20,
+                bottom: -20,
+                child: Icon(Icons.forum_rounded, size: 150, color: Colors.white.withOpacity(0.1)),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildMessageBubble(String text, bool isBot, bool isDark, ThemeData theme) {
+  Widget _buildMessageBubble(String text, bool isBot, bool isDark, ColorScheme colorScheme) {
     return Align(
       alignment: isBot ? Alignment.centerLeft : Alignment.centerRight,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
           color: isBot 
-              ? (isDark ? const Color(0xFF2C2C2E) : Colors.white)
-              : (isDark ? theme.colorScheme.primary.withOpacity(0.8) : Colors.green[100]),
+              ? (isDark ? const Color(0xFF1E1E1E) : Colors.white)
+              : colorScheme.primary,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(isBot ? 0 : 20),
-            bottomRight: Radius.circular(isBot ? 20 : 0),
+            topLeft: const Radius.circular(24),
+            topRight: const Radius.circular(24),
+            bottomLeft: Radius.circular(isBot ? 4 : 24),
+            bottomRight: Radius.circular(isBot ? 24 : 4),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
         child: Text(
           text,
           style: TextStyle(
             color: isBot 
-                ? (isDark ? Colors.white.withOpacity(0.9) : Colors.black87)
-                : (isDark ? Colors.white : Colors.black87),
+                ? (isDark ? Colors.white70 : Colors.black87)
+                : Colors.white,
             fontSize: 15,
-            height: 1.4,
+            height: 1.5,
+            fontWeight: isBot ? FontWeight.w500 : FontWeight.w600,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTypingIndicator(bool isDark) {
+  Widget _buildTypingIndicator(bool isDark, ColorScheme colorScheme) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-            bottomLeft: Radius.zero,
-            bottomRight: Radius.circular(20),
-          ),
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(
-                isDark ? Colors.greenAccent : Colors.green),
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('AI is thinking', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 12, height: 12,
+              child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildInputArea(AppProvider provider, bool isTwi, bool isDark, ThemeData theme) {
+  Widget _buildInputArea(AppProvider provider, bool isTwi, bool isDark, ColorScheme colorScheme) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPadding > 0 ? bottomPadding : 16),
       decoration: BoxDecoration(
-        color: isDark ? theme.colorScheme.surface : Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.5 : 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5)),
         ],
       ),
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _controller,
-              enabled: !provider.isChatLoading,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-              decoration: InputDecoration(
-                hintText: isTwi ? 'Bisa asɛm bi...' : 'Ask a question...',
-                hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(28),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: isDark ? const Color(0xFF1C1C1E) : Colors.grey[100],
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF4F7F4),
+                borderRadius: BorderRadius.circular(30),
               ),
-              onSubmitted: (_) => _sendMessage(),
+              child: TextField(
+                controller: _controller,
+                enabled: !provider.isChatLoading,
+                style: const TextStyle(fontSize: 15),
+                decoration: InputDecoration(
+                  hintText: isTwi ? 'Bisa asɛm bi...' : 'Ask your farm question...',
+                  hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  border: InputBorder.none,
+                ),
+                onSubmitted: (_) => _sendMessage(),
+              ),
             ),
           ),
           const SizedBox(width: 12),
           GestureDetector(
             onTap: provider.isChatLoading ? null : _sendMessage,
-            child: CircleAvatar(
-              radius: 24,
-              backgroundColor: isDark ? Colors.greenAccent : Colors.green,
-              child: provider.isChatLoading 
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                  : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+            child: Container(
+              height: 52,
+              width: 52,
+              decoration: BoxDecoration(
+                color: colorScheme.primary,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(color: colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: Center(
+                child: provider.isChatLoading 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.send_rounded, color: Colors.white, size: 22),
+              ),
             ),
           ),
         ],
