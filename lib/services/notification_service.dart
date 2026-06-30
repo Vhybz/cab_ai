@@ -1,7 +1,8 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:geolocator/geolocator.dart';
 
 class NotificationService {
   static final NotificationService _notificationService = NotificationService._internal();
@@ -15,6 +16,8 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
+    if (kIsWeb) return; // Local notifications not supported on web in this setup
+
     // 1. Android Initialization Settings - Reset to confirmed existing icon
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -28,10 +31,13 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
     // 2. Request Permissions (Crucial for Android 13+)
-    if (Platform.isAndroid) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
       await flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission();
+      
+      // Request location permission as well
+      await Geolocator.requestPermission();
     }
   }
 
@@ -46,8 +52,6 @@ class NotificationService {
       showWhen: true,
       playSound: true,
       enableVibration: true,
-      // Resetting icon to confirmed resource
-      largeIcon: DrawableResourceAndroidBitmap('ic_launcher'),
     );
     
     const NotificationDetails platformChannelSpecifics =
@@ -74,7 +78,6 @@ class NotificationService {
           channelDescription: 'Notifications for scheduled cabbage scans',
           importance: Importance.max,
           priority: Priority.high,
-          largeIcon: DrawableResourceAndroidBitmap('ic_launcher'),
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,

@@ -8,32 +8,113 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
+      backgroundColor: const Color(0xFFFFFFFF),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          _buildHeroHeader(colorScheme),
+          SliverAppBar(
+            expandedHeight: 120,
+            pinned: true,
+            backgroundColor: const Color(0xFF2E7D32),
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            centerTitle: true,
+            leading: Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: true,
+              title: Text(
+                'About'.toUpperCase(),
+                style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 10, letterSpacing: 3),
+              ),
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(
+                  Theme.of(context).brightness == Brightness.light ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                onPressed: () => provider.toggleTheme(Theme.of(context).brightness == Brightness.light),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 100),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildBrandCard(isDark, colorScheme),
+                  Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Image.asset(
+                              'assets/images/c10.jpg',
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Cabbage disease classification app',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20), letterSpacing: -0.5),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFBC02D).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'v1.0.1 STABLE',
+                            style: TextStyle(color: Color(0xFFFBC02D), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 64),
+                  _buildSection('OUR MISSION', 'Empowering Ghanaian farmers with AI to secure food production and improve yields through cutting-edge diagnostics.'),
+                  _buildSection('DEVELOPMENT TEAM', 'Crafted by Final Year IT Students from UENR, Sunyani. Our team is dedicated to solving real-world agricultural challenges using technology.'),
+                  _buildSection('CORE TECHNOLOGY', 'The platform leverages Flutter for multi-platform reach, Google Gemini for expert agricultural advice, and Supabase for secure data orchestration.'),
+                  
+                  const SizedBox(height: 64),
+                  const Divider(color: Color(0xFFE8F5E9)),
                   const SizedBox(height: 32),
-                  _buildInfoSection(Icons.rocket_launch_rounded, 'OUR MISSION', 'Empowering Ghanaian farmers with AI to secure food production and improve yields through technology.', colorScheme),
-                  const SizedBox(height: 24),
-                  _buildInfoSection(Icons.groups_rounded, 'DEVELOPMENT TEAM', 'Built by Final Year IT Students from UENR, Sunyani, dedicated to agricultural innovation.', colorScheme),
-                  const SizedBox(height: 24),
-                  _buildInfoSection(Icons.memory_rounded, 'CORE TECHNOLOGY', 'Powered by Flutter, TensorFlow Lite, and Supabase for secure, real-time crop diagnostics.', colorScheme),
-                  const SizedBox(height: 48),
-                  _buildInstitutionBadge(isDark, colorScheme),
-                  const SizedBox(height: 40),
-                  Text('© ${DateTime.now().year} UENR IT Students', style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  Center(
+                    child: Text(
+                      '© ${DateTime.now().year} UENR IT STUDENTS'.toUpperCase(),
+                      style: TextStyle(color: const Color(0xFF1B5E20).withValues(alpha: 0.2), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 2),
+                    ),
+                  ),
+                  const SizedBox(height: 64),
                 ],
               ),
             ),
@@ -43,81 +124,21 @@ class AboutScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeroHeader(ColorScheme colorScheme) {
-    return SliverAppBar(
-      expandedHeight: 200,
-      pinned: true,
-      backgroundColor: colorScheme.primary,
-      flexibleSpace: FlexibleSpaceBar(
-        title: const Text('About Cabbage Doctor', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-        centerTitle: true,
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [colorScheme.primary, colorScheme.secondary]),
-          ),
-          child: Opacity(
-            opacity: 0.1,
-            child: Icon(Icons.eco_rounded, size: 200, color: Colors.white),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBrandCard(bool isDark, ColorScheme colorScheme) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: colorScheme.primary.withOpacity(0.2), width: 2)),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(70),
-            child: Image.asset('assets/images/c7.jpg', width: 140, height: 140, fit: BoxFit.cover),
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text('Cabbage Doctor AI', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -1)),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(color: colorScheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-          child: Text('VERSION 1.0.1 (STABLE)', style: TextStyle(color: colorScheme.primary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoSection(IconData icon, String title, String content, ColorScheme colorScheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 18, color: colorScheme.primary),
-            const SizedBox(width: 12),
-            Text(title, style: TextStyle(color: colorScheme.primary, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(content, style: const TextStyle(fontSize: 15, height: 1.6, fontWeight: FontWeight.w500, color: Colors.grey)),
-      ],
-    );
-  }
-
-  Widget _buildInstitutionBadge(bool isDark, ColorScheme colorScheme) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
-      ),
+  Widget _buildSection(String title, String content) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 48.0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.school_rounded, color: Colors.grey, size: 30),
-          const SizedBox(height: 12),
-          const Text('University of Energy and Natural Resources', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const Text('Department of IT • Sunyani, Ghana', style: TextStyle(color: Colors.grey, fontSize: 11)),
+          Text(
+            title,
+            style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 2),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            content,
+            style: const TextStyle(color: Colors.black54, fontSize: 16, height: 1.6, fontWeight: FontWeight.w500),
+          ),
         ],
       ),
     );

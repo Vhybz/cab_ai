@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/app_provider.dart';
@@ -44,7 +42,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     });
     _scrollToBottom();
 
-    final response = await provider.askGemini(prompt);
+    final response = await provider.askAi(prompt);
 
     if (mounted) {
       setState(() {
@@ -57,13 +55,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
-    final isTwi = provider.language == 'Twi';
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final isTwi = provider.language == 'Twi';
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(
         children: [
           Expanded(
@@ -71,18 +68,83 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               controller: _scrollController,
               physics: const BouncingScrollPhysics(),
               slivers: [
-                _buildSliverAppBar(colorScheme, isTwi),
+                SliverAppBar(
+                  expandedHeight: 100,
+                  pinned: true,
+                  backgroundColor: colorScheme.primary,
+                  elevation: 0,
+                  surfaceTintColor: Colors.transparent,
+                  centerTitle: true,
+                  leading: Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  flexibleSpace: FlexibleSpaceBar(
+                    centerTitle: true,
+                    title: Text(
+                      (isTwi ? 'Kabeji Mmoawa' : 'AI Assistant').toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 10, letterSpacing: 3),
+                    ),
+                    background: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [colorScheme.primary.withValues(alpha: 0.8), colorScheme.primary],
+                        ),
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.psychology_rounded, color: Colors.white),
+                      onSelected: (value) => provider.setAiModel(value),
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(value: 'Gemini', child: Text('Google Gemini')),
+                        const PopupMenuItem(value: 'Llama', child: Text('Meta Llama 3')),
+                      ],
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Theme.of(context).brightness == Brightness.light ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: () => provider.toggleTheme(Theme.of(context).brightness == Brightness.light),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+                SliverToBoxAdapter(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    child: Center(
+                      child: Text(
+                        'Using: ${provider.selectedAiModel}',
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         if (index == _messages.length) {
-                          return _buildTypingIndicator(isDark, colorScheme);
+                          return _buildTypingIndicator(colorScheme);
                         }
                         final msg = _messages[index];
                         final isBot = msg['role'] == 'bot';
-                        return _buildMessageBubble(msg['text']!, isBot, isDark, colorScheme);
+                        return _buildMessageBubble(msg['text']!, isBot, theme, colorScheme);
                       },
                       childCount: _messages.length + (provider.isChatLoading ? 1 : 0),
                     ),
@@ -91,82 +153,35 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               ],
             ),
           ),
-          _buildInputArea(provider, isTwi, isDark, colorScheme),
+          _buildInputArea(provider, isTwi, theme, colorScheme),
         ],
       ),
     );
   }
 
-  Widget _buildSliverAppBar(ColorScheme colorScheme, bool isTwi) {
-    return SliverAppBar(
-      expandedHeight: 140,
-      pinned: true,
-      stretch: true,
-      backgroundColor: colorScheme.primary,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-        onPressed: () => Navigator.pop(context),
-      ),
-      flexibleSpace: FlexibleSpaceBar(
-        centerTitle: true,
-        title: Text(
-          isTwi ? 'Kabeji Mmoawa' : 'Farm AI Assistant', 
-          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 18, letterSpacing: -0.5)
-        ),
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [colorScheme.primary, colorScheme.secondary],
-            ),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -20,
-                bottom: -20,
-                child: Icon(Icons.forum_rounded, size: 150, color: Colors.white.withOpacity(0.1)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMessageBubble(String text, bool isBot, bool isDark, ColorScheme colorScheme) {
+  Widget _buildMessageBubble(String text, bool isBot, ThemeData theme, ColorScheme colorScheme) {
     return Align(
       alignment: isBot ? Alignment.centerLeft : Alignment.centerRight,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          color: isBot 
-              ? (isDark ? const Color(0xFF1E1E1E) : Colors.white)
-              : colorScheme.primary,
+          color: isBot ? theme.cardColor : colorScheme.primary,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(24),
-            topRight: const Radius.circular(24),
-            bottomLeft: Radius.circular(isBot ? 4 : 24),
-            bottomRight: Radius.circular(isBot ? 24 : 4),
+            topLeft: const Radius.circular(20),
+            topRight: const Radius.circular(20),
+            bottomLeft: Radius.circular(isBot ? 0 : 20),
+            bottomRight: Radius.circular(isBot ? 20 : 0),
           ),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))
           ],
         ),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         child: Text(
           text,
           style: TextStyle(
-            color: isBot 
-                ? (isDark ? Colors.white70 : Colors.black87)
-                : Colors.white,
+            color: isBot ? colorScheme.onSurface : Colors.white,
             fontSize: 15,
             height: 1.5,
             fontWeight: isBot ? FontWeight.w500 : FontWeight.w600,
@@ -176,57 +191,44 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     );
   }
 
-  Widget _buildTypingIndicator(bool isDark, ColorScheme colorScheme) {
+  Widget _buildTypingIndicator(ColorScheme colorScheme) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('AI is thinking', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 12, height: 12,
-              child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary),
-            ),
-          ],
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        child: Text(
+          'Thinking...',
+          style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic),
         ),
       ),
     );
   }
 
-  Widget _buildInputArea(AppProvider provider, bool isTwi, bool isDark, ColorScheme colorScheme) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-    
+  Widget _buildInputArea(AppProvider provider, bool isTwi, ThemeData theme, ColorScheme colorScheme) {
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPadding > 0 ? bottomPadding : 16),
+      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: theme.cardColor,
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -5))
         ],
       ),
       child: Row(
         children: [
           Expanded(
             child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF4F7F4),
-                borderRadius: BorderRadius.circular(30),
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(24),
               ),
               child: TextField(
                 controller: _controller,
                 enabled: !provider.isChatLoading,
-                style: const TextStyle(fontSize: 15),
+                style: TextStyle(color: colorScheme.onSurface, fontSize: 15, fontWeight: FontWeight.w600),
                 decoration: InputDecoration(
-                  hintText: isTwi ? 'Bisa asɛm bi...' : 'Ask your farm question...',
-                  hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  hintText: isTwi ? 'Bisa asɛm bi...' : 'Ask your question...',
+                  hintStyle: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.4)),
                   border: InputBorder.none,
                 ),
                 onSubmitted: (_) => _sendMessage(),
@@ -234,23 +236,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          GestureDetector(
-            onTap: provider.isChatLoading ? null : _sendMessage,
-            child: Container(
-              height: 52,
-              width: 52,
-              decoration: BoxDecoration(
-                color: colorScheme.primary,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4)),
-                ],
-              ),
-              child: Center(
-                child: provider.isChatLoading 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.send_rounded, color: Colors.white, size: 22),
-              ),
+          Container(
+            decoration: BoxDecoration(color: colorScheme.secondary, shape: BoxShape.circle),
+            child: IconButton(
+              onPressed: provider.isChatLoading ? null : _sendMessage,
+              icon: const Icon(Icons.send_rounded, color: Colors.black, size: 22),
             ),
           ),
         ],

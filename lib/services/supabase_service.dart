@@ -1,7 +1,9 @@
-import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/prediction_model.dart';
 import '../models/schedule_model.dart';
 
@@ -49,63 +51,8 @@ class SupabaseService {
     return await _client.auth.signInWithPassword(email: email, password: password);
   }
 
-  Future<AuthResponse> signInWithGoogle() async {
-    try {
-      const webClientId = '714676926049-pr7m1k73409d3mifn47gs19c6aft2s0n.apps.googleusercontent.com';
-
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        serverClientId: webClientId,
-      );
-      
-      final googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        throw 'Google Sign-In was canceled.';
-      }
-      
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
-      final accessToken = googleAuth.accessToken;
-
-      if (idToken == null) {
-        throw 'Failed to retrieve Google ID Token.';
-      }
-
-      final response = await _client.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
-      );
-
-      if (response.user != null) {
-        // Automatically extract details from Google Metadata and sync with Profile
-        final metadata = response.user!.userMetadata;
-        final fullName = metadata?['full_name'] ?? googleUser.displayName ?? '';
-        final firstName = fullName.split(' ').first;
-        final surname = fullName.contains(' ') ? fullName.split(' ').sublist(1).join(' ') : '';
-        final avatarUrl = metadata?['avatar_url'] ?? metadata?['picture'] ?? googleUser.photoUrl;
-
-        await _client.from('profiles').upsert({
-          'id': response.user!.id,
-          'first_name': firstName,
-          'surname': surname,
-          'avatar_url': avatarUrl,
-        }, onConflict: 'id');
-      }
-
-      return response;
-    } catch (e) {
-      debugPrint('Google Sign-In Error: $e');
-      rethrow;
-    }
-  }
-
   Future<void> signOut() async {
     await _client.auth.signOut();
-    try {
-      await GoogleSignIn().signOut();
-    } catch (e) {
-      debugPrint('Error during Google Sign-Out: $e');
-    }
   }
 
   Future<void> resetPassword(String email) async {
@@ -115,12 +62,12 @@ class SupabaseService {
         redirectTo: 'io.supabase.cabageai://reset-password/',
       );
     } catch (e) {
-      print('Reset Password Error: $e');
+      debugPrint('Reset Password Error: $e');
       rethrow;
     }
   }
 
-  Future<void> saveScan(Prediction scan, File imageFile) async {
+  Future<void> saveScan(Prediction scan, String filePath, Uint8List bytes) async {
     final userId = currentUser?.id;
     if (userId == null) return;
 
@@ -128,7 +75,11 @@ class SupabaseService {
     final path = '$userId/$fileName';
 
     try {
-      await _client.storage.from('leaf_scans').upload(path, imageFile);
+      await _client.storage.from('leaf_scans').uploadBinary(
+        path, 
+        bytes,
+        fileOptions: const FileOptions(upsert: true),
+      );
       final imageUrl = _client.storage.from('leaf_scans').getPublicUrl(path);
 
       await _client.from('scan_history').insert({
@@ -141,7 +92,7 @@ class SupabaseService {
         'is_leaf': scan.isLeaf,
       });
     } catch (e) {
-      print('Supabase Save Scan Error: $e');
+      debugPrint('Supabase Save Scan Error: $e');
     }
   }
 
@@ -170,7 +121,7 @@ class SupabaseService {
         );
       }).toList();
     } catch (e) {
-      print('Fetch scans error: $e');
+      debugPrint('Fetch scans error: $e');
       return [];
     }
   }
@@ -186,7 +137,7 @@ class SupabaseService {
       final path = '$userId/$fileName';
       await _client.storage.from('leaf_scans').remove([path]);
     } catch (e) {
-      print('Supabase Delete Scan Error: $e');
+      debugPrint('Supabase Delete Scan Error: $e');
     }
   }
 
@@ -204,7 +155,7 @@ class SupabaseService {
       
       return response['id'].toString();
     } catch (e) {
-      print('Supabase Add Schedule Error: $e');
+      debugPrint('Supabase Add Schedule Error: $e');
       return null;
     }
   }
@@ -217,7 +168,7 @@ class SupabaseService {
       dynamic idToMatch = int.tryParse(scheduleId) ?? scheduleId;
       await _client.from('schedules').delete().eq('id', idToMatch).eq('user_id', userId);
     } catch (e) {
-      print('Supabase Delete Schedule Error: $e');
+      debugPrint('Supabase Delete Schedule Error: $e');
     }
   }
 
@@ -239,7 +190,7 @@ class SupabaseService {
         'isCompleted': e['is_completed'],
       })).toList();
     } catch (e) {
-      print('Supabase Fetch Schedules Error: $e');
+      debugPrint('Supabase Fetch Schedules Error: $e');
       return [];
     }
   }
@@ -249,7 +200,13 @@ class SupabaseService {
     if (userId == null) return null;
 
     final response = await _client.from('profiles').select().eq('id', userId).single();
-    return response as Map<String, dynamic>;
+    return response;
+  }
+
+  Future<void> updateAvatarUrl(String url) async {
+    final userId = currentUser?.id;
+    if (userId == null) return;
+    await _client.from('profiles').update({'avatar_url': url}).eq('id', userId);
   }
 
   Future<void> updateUserProfile({
@@ -277,52 +234,112 @@ class SupabaseService {
     }).eq('id', userId);
   }
 
-  Future<String?> uploadAvatar(File imageFile) async {
+  Future<String?> uploadAvatar(String path, Uint8List bytes) async {
     final userId = currentUser?.id;
     if (userId == null) return null;
 
     final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final path = '$userId/$fileName';
+    final storagePath = '$userId/$fileName';
 
     try {
-      await _client.storage.from('avatars').upload(path, imageFile);
-      return _client.storage.from('avatars').getPublicUrl(path);
+      await _client.storage.from('avatars').uploadBinary(
+        storagePath, 
+        bytes,
+        fileOptions: const FileOptions(upsert: true),
+      );
+      return _client.storage.from('avatars').getPublicUrl(storagePath);
     } catch (e) {
-      print('Supabase Avatar Upload Error: $e');
+      debugPrint('Supabase Avatar Upload Error: $e');
+      return null;
+    }
+  }
+
+  Future<dynamic> callSmoothApi(Uint8List imageBytes) async {
+    try {
+      final response = await _client.functions.invoke(
+        dotenv.env['SMOOTH_API_FUNCTION_NAME'] ?? 'smooth-api',
+        body: imageBytes,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+      );
+      return response.data;
+    } catch (e) {
+      debugPrint('Supabase Smooth API Error: $e');
       return null;
     }
   }
 
   Future<String> askGemini(String prompt) async {
     try {
-      final response = await _client.functions.invoke(
-        'cabbage-doctor',
-        body: {
-          'prompt': prompt,
-          'content': prompt,
-          'message': prompt,
-        },
-      );
-      
-      if (response.status == 200) {
-        if (response.data is Map) {
-          final data = response.data as Map;
-          return data['reply']?.toString() ?? 
-                 data['message']?.toString() ?? 
-                 data['text']?.toString() ?? 
-                 data['content']?.toString() ??
-                 data.toString();
-        }
-        return response.data.toString();
-      } else {
-        if (response.data is Map && response.data['error'] != null) {
-          return 'AI Error: ${response.data['error']}';
-        }
-        return 'Error ${response.status}: ${response.data}';
+      final apiKey = dotenv.env['GEMINI_API_KEY']?.trim();
+      if (apiKey == null || apiKey.isEmpty) {
+        return 'Error: GEMINI_API_KEY is not set in assets/cab.env';
       }
-    } on FunctionException catch (e) {
-      return 'Function Error: ${e.status} - ${e.details}';
+
+      final model = GenerativeModel(
+        model: 'gemini-1.5-flash',
+        apiKey: apiKey,
+      );
+
+      final fullPrompt = 'You are an expert Agricultural AI assistant specializing ONLY in cabbage farming. '
+          'Your knowledge is restricted to cabbage cultivation, cabbage diseases, pests, soil management, and general agricultural advice for cabbage farmers. '
+          'If the user asks about topics unrelated to cabbage or farming (like politics, entertainment, or other crops), '
+          'politely decline and inform them that you are a dedicated Cabbage AI Assistant. '
+          'A farmer is asking: "$prompt". '
+          'Provide a concise, helpful, and professional answer. '
+          'Always respond in English, even if the user asks in another language.';
+
+      final content = [Content.text(fullPrompt)];
+      final response = await model.generateContent(content);
+
+      return response.text ?? 'AI returned an empty response.';
     } catch (e) {
+      debugPrint('Gemini Direct Error: $e');
+      return 'AI unreachable: $e';
+    }
+  }
+
+  Future<String> askLlama(String prompt) async {
+    try {
+      final apiKey = dotenv.env['GROQ_API_KEY']?.trim();
+      if (apiKey == null || apiKey.isEmpty || apiKey == 'YOUR_GROQ_API_KEY_HERE') {
+        return 'Error: GROQ_API_KEY is not set in assets/cab.env. Please get one from groq.com';
+      }
+
+      const url = 'https://api.groq.com/openai/v1/chat/completions';
+      
+      const systemPrompt = 'You are an expert Agricultural AI assistant specializing ONLY in cabbage farming. '
+          'You must ONLY answer questions related to cabbage cultivation, cabbage diseases (like Black Rot, Downy Mildew), '
+          'pests, soil health, and general cabbage farming practices. '
+          'If the user asks about anything outside of cabbage farming (e.g., general knowledge, sports, other crops, or unrelated topics), '
+          'politely decline and explain that you are specialized only in helping cabbage farmers. '
+          'Keep answers professional and concise. Always respond in English, even if the user asks in another language like Twi.';
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': 'llama-3.3-70b-versatile',
+          'messages': [
+            {'role': 'system', 'content': systemPrompt},
+            {'role': 'user', 'content': prompt},
+          ],
+          'temperature': 0.7,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['choices'][0]['message']['content'] ?? 'Llama returned an empty response.';
+      } else {
+        return 'Groq API Error: ${response.statusCode} - ${response.body}';
+      }
+    } catch (e) {
+      debugPrint('Llama (Groq) Error: $e');
       return 'AI unreachable: $e';
     }
   }

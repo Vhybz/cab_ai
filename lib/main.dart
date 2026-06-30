@@ -9,39 +9,58 @@ import 'screens/reset_password_screen.dart';
 import 'services/notification_service.dart';
 
 void main() async {
-  // Ensure Flutter bindings are initialized
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Load environment variables from cab.env
   try {
-    await dotenv.load(fileName: "cab.env");
-  } catch (e) {
-    debugPrint('Warning: Could not load cab.env file: $e');
+    FlutterError.onError = (details) {
+      debugPrint('Flutter Error: ${details.exception}');
+    };
+
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    try {
+      await dotenv.load(fileName: "assets/cab.env");
+    } catch (e) {
+      debugPrint('Warning: Could not load cab.env file: $e');
+    }
+    
+    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+    final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+
+    try {
+      await Supabase.initialize(
+        url: supabaseUrl,
+        publishableKey: supabaseKey,
+      );
+    } catch (e) {
+      debugPrint('Supabase Init Error: $e');
+    }
+    
+    try {
+      await Hive.initFlutter();
+      await Hive.openBox('settings');
+      await Hive.openBox('scan_history');
+      await Hive.openBox('schedules');
+    } catch (e) {
+      debugPrint('Hive Init Error: $e');
+    }
+    
+    try {
+      await NotificationService().init();
+    } catch (e) {
+      debugPrint('Notifications Init Error: $e');
+    }
+    
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AppProvider()),
+        ],
+        child: const CabbageDoctorApp(),
+      ),
+    );
+  } catch (error, stackTrace) {
+    debugPrint('CRITICAL APP CRASH: $error');
+    debugPrint(stackTrace.toString());
   }
-  
-  // Initialize Supabase with your credentials
-  await Supabase.initialize(
-    url: 'https://xshzslaaqcinvhlzudxt.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzaHpzbGFhcWNpbnZobHp1ZHh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNjUzNTIsImV4cCI6MjA5MTk0MTM1Mn0.LjeSqui4AKyiF6S_cqqWa8haJRfMtrgIAReM0Az_qVw',
-  );
-  
-  // Initialize Hive for offline storage
-  await Hive.initFlutter();
-  await Hive.openBox('settings');
-  await Hive.openBox('scan_history');
-  await Hive.openBox('schedules');
-  
-  // Initialize notification service
-  await NotificationService().init();
-  
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AppProvider()),
-      ],
-      child: const CabbageDoctorApp(),
-    ),
-  );
 }
 
 class CabbageDoctorApp extends StatefulWidget {
@@ -77,33 +96,51 @@ class _CabbageDoctorAppState extends State<CabbageDoctorApp> {
       builder: (context, provider, child) {
         return MaterialApp(
           navigatorKey: _navigatorKey,
-          title: 'Cabbage Doctor',
+          title: 'Cabbage disease classification app',
           debugShowCheckedModeBanner: false,
           themeMode: provider.themeMode,
           theme: ThemeData(
             useMaterial3: true,
+            scaffoldBackgroundColor: const Color(0xFFFFFFFF),
             colorScheme: ColorScheme.fromSeed(
               seedColor: const Color(0xFF2E7D32),
               primary: const Color(0xFF2E7D32),
+              secondary: const Color(0xFFFBC02D),
+              surface: const Color(0xFFFFFFFF),
+              onSurface: const Color(0xFF1B5E20),
               brightness: Brightness.light,
             ),
             cardTheme: CardThemeData(
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              color: const Color(0xFFF1F8E9),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               clipBehavior: Clip.antiAlias,
+            ),
+            appBarTheme: const AppBarTheme(
+              centerTitle: true,
+              elevation: 0,
             ),
           ),
           darkTheme: ThemeData(
             useMaterial3: true,
+            scaffoldBackgroundColor: const Color(0xFF0A0C0A),
             colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF2E7D32),
+              seedColor: const Color(0xFF4CAF50),
               primary: const Color(0xFF4CAF50),
+              secondary: const Color(0xFFFFEB3B),
+              surface: const Color(0xFF151A15),
+              onSurface: Colors.white,
               brightness: Brightness.dark,
             ),
             cardTheme: CardThemeData(
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              color: const Color(0xFF1B241B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               clipBehavior: Clip.antiAlias,
+            ),
+            appBarTheme: const AppBarTheme(
+              centerTitle: true,
+              elevation: 0,
             ),
           ),
           home: const SplashScreen(),

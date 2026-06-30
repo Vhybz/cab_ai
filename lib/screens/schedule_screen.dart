@@ -3,7 +3,6 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../services/app_provider.dart';
-import '../services/notification_service.dart';
 import '../models/schedule_model.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -14,18 +13,17 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   TimeOfDay _selectedTime = TimeOfDay.now();
   String _selectedActivity = 'Scanning';
 
   final List<Map<String, dynamic>> _activities = [
-    {'name': 'Scanning', 'icon': Icons.qr_code_scanner_rounded, 'color': Colors.blue, 'desc': 'Use AI to check for diseases early.'},
-    {'name': 'Watering', 'icon': Icons.water_drop_rounded, 'color': Colors.cyan, 'desc': 'Maintain consistent soil moisture.'},
-    {'name': 'Pruning', 'icon': Icons.content_cut_rounded, 'color': Colors.orange, 'desc': 'Remove damaged or infected parts.'},
-    {'name': 'Fertilizing', 'icon': Icons.grain_rounded, 'color': Colors.purple, 'desc': 'Apply nitrogen-rich nutrients.'},
-    {'name': 'Pest Control', 'icon': Icons.bug_report_rounded, 'color': Colors.red, 'desc': 'Monitor for caterpillars & aphids.'},
+    {'name': 'Scanning', 'icon': Icons.qr_code_scanner_rounded, 'color': const Color(0xFF2E7D32)},
+    {'name': 'Watering', 'icon': Icons.water_drop_rounded, 'color': Colors.blue},
+    {'name': 'Pruning', 'icon': Icons.content_cut_rounded, 'color': const Color(0xFFFBC02D)},
+    {'name': 'Fertilizing', 'icon': Icons.grain_rounded, 'color': Colors.brown},
+    {'name': 'Pest Control', 'icon': Icons.bug_report_rounded, 'color': Colors.redAccent},
   ];
 
   @override
@@ -49,35 +47,75 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
+      backgroundColor: const Color(0xFFFFFFFF),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          _buildSliverAppBar(context, provider, colorScheme),
+          SliverAppBar(
+            expandedHeight: 120,
+            pinned: true,
+            backgroundColor: const Color(0xFF2E7D32),
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            centerTitle: true,
+            leading: Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: true,
+              title: Text(
+                provider.tr('Farm Planner').toUpperCase(),
+                style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 10, letterSpacing: 3),
+              ),
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(
+                  Theme.of(context).brightness == Brightness.light ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                onPressed: () => provider.toggleTheme(Theme.of(context).brightness == Brightness.light),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSmartHero(provider, colorScheme),
-                  const SizedBox(height: 32),
-                  _buildSectionLabel('SELECT DATE & TASK'),
-                  const SizedBox(height: 16),
-                  _buildCalendarCard(colorScheme, isDark),
-                  const SizedBox(height: 24),
-                  _buildActivityList(provider, colorScheme, isDark),
-                  const SizedBox(height: 32),
-                  _buildSchedulingControls(context, provider, colorScheme, isDark),
+                  _buildSmartHero(provider),
                   const SizedBox(height: 40),
+                  _buildSectionLabel('SELECT DATE'),
+                  const SizedBox(height: 16),
+                  _buildCalendarCard(),
+                  const SizedBox(height: 40),
+                  _buildSectionLabel('SELECT TASK'),
+                  const SizedBox(height: 16),
+                  _buildActivityList(provider),
+                  const SizedBox(height: 40),
+                  _buildSchedulingControls(context, provider),
+                  const SizedBox(height: 48),
                   _buildSectionLabel('UPCOMING FIELD WORK'),
                   const SizedBox(height: 16),
-                  _buildUpcomingList(provider, colorScheme, isDark),
+                  _buildUpcomingList(provider),
                 ],
               ),
             ),
@@ -87,78 +125,37 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  Widget _buildSliverAppBar(BuildContext context, AppProvider provider, ColorScheme colorScheme) {
-    return SliverAppBar(
-      expandedHeight: 140,
-      pinned: true,
-      stretch: true,
-      backgroundColor: colorScheme.primary,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-        onPressed: () => Navigator.pop(context),
-      ),
-      flexibleSpace: FlexibleSpaceBar(
-        centerTitle: true,
-        title: Text(
-          provider.tr('Farm Planner'), 
-          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 18, letterSpacing: -0.5)
-        ),
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [colorScheme.primary, colorScheme.secondary],
-            ),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -20,
-                bottom: -20,
-                child: Icon(Icons.event_note_rounded, size: 150, color: Colors.white.withOpacity(0.1)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  Widget _buildSectionLabel(String text) {
+    return Text(text, style: TextStyle(color: const Color(0xFF1B5E20).withValues(alpha: 0.4), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5));
   }
 
-  Widget _buildSmartHero(AppProvider provider, ColorScheme colorScheme) {
+  Widget _buildSmartHero(AppProvider provider) {
     final day = _selectedDay ?? DateTime.now();
     final suggestion = provider.getSuggestedActivity(day);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [colorScheme.primary, colorScheme.secondary]),
-        borderRadius: BorderRadius.circular(30),
+        color: const Color(0xFFF1F8E9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.1)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('AI RECOMMENDATION', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                const SizedBox(height: 8),
-                Text(suggestion, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-              ],
-            ),
-          ),
-          const Icon(Icons.auto_awesome_rounded, color: Colors.white54, size: 40),
+          Text('AI SMART SUGGESTION', style: TextStyle(color: const Color(0xFF2E7D32).withValues(alpha: 0.5), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
+          const SizedBox(height: 12),
+          Text(suggestion, style: const TextStyle(color: Color(0xFF1B5E20), fontSize: 20, fontWeight: FontWeight.w800)),
         ],
       ),
     );
   }
 
-  Widget _buildCalendarCard(ColorScheme colorScheme, bool isDark) {
+  Widget _buildCalendarCard() {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        color: const Color(0xFFF1F8E9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.05)),
       ),
       child: TableCalendar(
         firstDay: DateTime.now(),
@@ -171,17 +168,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           _updateSelectedActivityToSuggestion(selectedDay);
         },
         calendarStyle: CalendarStyle(
-          selectedDecoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
-          todayDecoration: BoxDecoration(color: colorScheme.primary.withOpacity(0.1), shape: BoxShape.circle, border: Border.all(color: colorScheme.primary)),
+          defaultTextStyle: const TextStyle(color: Color(0xFF1B5E20), fontWeight: FontWeight.w600),
+          weekendTextStyle: const TextStyle(color: Color(0xFF1B5E20), fontWeight: FontWeight.w600),
+          selectedDecoration: const BoxDecoration(color: Color(0xFF2E7D32), shape: BoxShape.circle),
+          selectedTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          todayDecoration: BoxDecoration(color: const Color(0xFFFBC02D).withValues(alpha: 0.3), shape: BoxShape.circle),
+          todayTextStyle: const TextStyle(color: Color(0xFF1B5E20), fontWeight: FontWeight.bold),
         ),
-        headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true),
+        headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true, titleTextStyle: TextStyle(color: Color(0xFF1B5E20), fontWeight: FontWeight.w800)),
+        daysOfWeekStyle: const DaysOfWeekStyle(weekdayStyle: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w700), weekendStyle: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w700)),
       ),
     );
   }
 
-  Widget _buildActivityList(AppProvider provider, ColorScheme colorScheme, bool isDark) {
+  Widget _buildActivityList(AppProvider provider) {
     return SizedBox(
-      height: 100,
+      height: 90,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: _activities.length,
@@ -190,20 +192,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           final isSelected = _selectedActivity == act['name'];
           return GestureDetector(
             onTap: () => setState(() => _selectedActivity = act['name']),
-            child: Container(
-              width: 100,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 90,
               margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
-                color: isSelected ? colorScheme.primary : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: isSelected ? colorScheme.primary : Colors.grey.withOpacity(0.1)),
+                color: isSelected ? const Color(0xFF2E7D32) : const Color(0xFFF1F8E9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isSelected ? const Color(0xFF2E7D32) : Colors.black.withValues(alpha: 0.05)),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(act['icon'], color: isSelected ? Colors.white : act['color'], size: 28),
+                  Icon(act['icon'], color: isSelected ? Colors.white : act['color'], size: 22),
                   const SizedBox(height: 8),
-                  Text(provider.tr(act['name']), style: TextStyle(color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87), fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text(provider.tr(act['name']), style: TextStyle(color: isSelected ? Colors.white : const Color(0xFF1B5E20).withValues(alpha: 0.6), fontSize: 11, fontWeight: FontWeight.w800)),
                 ],
               ),
             ),
@@ -213,53 +216,72 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  Widget _buildSchedulingControls(BuildContext context, AppProvider provider, ColorScheme colorScheme, bool isDark) {
+  Widget _buildSchedulingControls(BuildContext context, AppProvider provider) {
     return Column(
       children: [
-        ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          tileColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.grey.withOpacity(0.1))),
-          leading: const Icon(Icons.alarm_rounded),
-          title: Text(provider.tr('Reminder Time'), style: const TextStyle(fontWeight: FontWeight.bold)),
-          trailing: Text(_selectedTime.format(context), style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w900, fontSize: 18)),
+        InkWell(
           onTap: () async {
-            final picked = await showTimePicker(context: context, initialTime: _selectedTime);
+            final picked = await showTimePicker(
+              context: context, 
+              initialTime: _selectedTime,
+              builder: (context, child) => Theme(
+                data: ThemeData.light().copyWith(
+                  colorScheme: const ColorScheme.light(primary: Color(0xFF2E7D32), onPrimary: Colors.white, surface: Colors.white),
+                ),
+                child: child!,
+              ),
+            );
             if (picked != null) setState(() => _selectedTime = picked);
           },
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F8E9),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.05)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(provider.tr('Reminder Time'), style: const TextStyle(color: Color(0xFF1B5E20), fontSize: 15, fontWeight: FontWeight.w600)),
+                Text(_selectedTime.format(context), style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w800, fontSize: 18)),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         ElevatedButton(
           onPressed: _scheduleActivity,
           style: ElevatedButton.styleFrom(
-            backgroundColor: colorScheme.primary,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 60),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: const Color(0xFFFBC02D),
+            foregroundColor: Colors.black,
+            minimumSize: const Size(double.infinity, 64),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 2,
           ),
-          child: Text(provider.tr('Add to Field Schedule').toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+          child: Text(provider.tr('Add to Schedule').toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1)),
         ),
       ],
     );
   }
 
-  Widget _buildUpcomingList(AppProvider provider, ColorScheme colorScheme, bool isDark) {
+  Widget _buildUpcomingList(AppProvider provider) {
     final upcoming = provider.schedules.where((s) => s.dateTime.isAfter(DateTime.now())).toList();
-    if (upcoming.isEmpty) return const Center(child: Text('No tasks scheduled', style: TextStyle(color: Colors.grey)));
+    if (upcoming.isEmpty) return const Center(child: Text('No tasks scheduled', style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w500)));
 
     return Column(
       children: upcoming.map((item) => Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.withOpacity(0.1)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
         ),
         child: ListTile(
-          leading: Icon(_getActivityIcon(item.activity), color: colorScheme.primary),
-          title: Text(provider.tr(item.activity), style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text(DateFormat('MMM dd, hh:mm a').format(item.dateTime)),
-          trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent), onPressed: () => provider.deleteSchedule(item.id)),
+          leading: Icon(_getActivityIcon(item.activity), color: const Color(0xFF2E7D32), size: 22),
+          title: Text(provider.tr(item.activity), style: const TextStyle(color: Color(0xFF1B5E20), fontWeight: FontWeight.w700, fontSize: 15)),
+          subtitle: Text(DateFormat('MMM dd, hh:mm a').format(item.dateTime), style: TextStyle(color: Colors.black.withValues(alpha: 0.3), fontSize: 12, fontWeight: FontWeight.w600)),
+          trailing: IconButton(icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20), onPressed: () => provider.deleteSchedule(item.id)),
         ),
       )).toList(),
     );
@@ -271,11 +293,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final provider = Provider.of<AppProvider>(context, listen: false);
     final newSchedule = Schedule(id: DateTime.now().millisecondsSinceEpoch.toString(), activity: _selectedActivity, dateTime: scheduledDateTime);
     provider.addSchedule(newSchedule);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${provider.tr(_selectedActivity)} Scheduled!'), backgroundColor: Colors.green));
-  }
-
-  Widget _buildSectionLabel(String text) {
-    return Text(text, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${provider.tr(_selectedActivity)} Scheduled!'), behavior: SnackBarBehavior.floating, backgroundColor: const Color(0xFF2E7D32)));
   }
 
   IconData _getActivityIcon(String activity) {

@@ -1,5 +1,6 @@
-import 'dart:io';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -9,7 +10,6 @@ import 'package:geocoding/geocoding.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/prediction_model.dart';
 import '../models/schedule_model.dart';
@@ -24,7 +24,7 @@ class AppProvider with ChangeNotifier {
   final ImagePicker _picker = ImagePicker();
   final FlutterTts _flutterTts = FlutterTts();
   
-  File? _selectedImage;
+  io.File? _selectedImage;
   Prediction? _currentPrediction;
   bool _isLoading = false;
   String _analysisMessage = 'ANALYZING LEAF...';
@@ -47,8 +47,9 @@ class AppProvider with ChangeNotifier {
 
   // AI Chat properties
   bool _isChatLoading = false;
+  String _selectedAiModel = 'Llama';
 
-  File? get selectedImage => _selectedImage;
+  io.File? get selectedImage => _selectedImage;
   Prediction? get currentPrediction => _currentPrediction;
   bool get isLoading => _isLoading;
   String get analysisMessage => _analysisMessage;
@@ -68,6 +69,7 @@ class AppProvider with ChangeNotifier {
   String get weatherDesc => _weatherDesc;
   bool get isWeatherLoading => _isWeatherLoading;
   bool get isChatLoading => _isChatLoading;
+  String get selectedAiModel => _selectedAiModel;
 
   String get firstName {
     if (_userName == 'Guest' || _userName.isEmpty) return 'Guest';
@@ -97,14 +99,9 @@ class AppProvider with ChangeNotifier {
     _lat = settingsBox.get('lat', defaultValue: 6.6666);
     _lon = settingsBox.get('lon', defaultValue: -1.6163);
     _notificationsEnabled = settingsBox.get('notificationsEnabled', defaultValue: true);
+    _selectedAiModel = settingsBox.get('selectedAiModel', defaultValue: 'Llama');
 
-    final historyBox = Hive.box('scan_history');
-    final List<dynamic> historyData = historyBox.get('history', defaultValue: []);
-    _history = historyData.map((e) => Prediction.fromMap(Map<String, dynamic>.from(e))).toList();
-
-    final scheduleBox = Hive.box('schedules');
-    final List<dynamic> scheduleData = scheduleBox.get('list', defaultValue: []);
-    _schedules = scheduleData.map((e) => Schedule.fromMap(Map<String, dynamic>.from(e))).toList();
+    await _loadUserHistoryAndSchedules();
     
     if (_supabaseService.currentUser != null) {
       await _loadUserData();
@@ -113,6 +110,18 @@ class AppProvider with ChangeNotifier {
     
     await fetchWeather();
     notifyListeners();
+  }
+
+  Future<void> _loadUserHistoryAndSchedules() async {
+    final userId = _supabaseService.currentUser?.id ?? 'guest';
+    
+    final historyBox = Hive.box('scan_history');
+    final List<dynamic> historyData = historyBox.get('history_$userId', defaultValue: []);
+    _history = historyData.map((e) => Prediction.fromMap(Map<String, dynamic>.from(e))).toList();
+
+    final scheduleBox = Hive.box('schedules');
+    final List<dynamic> scheduleData = scheduleBox.get('list_$userId', defaultValue: []);
+    _schedules = scheduleData.map((e) => Schedule.fromMap(Map<String, dynamic>.from(e))).toList();
   }
 
   Future<void> fetchWeather() async {
@@ -160,8 +169,12 @@ class AppProvider with ChangeNotifier {
   }
 
   void _initTts() async {
-    await _flutterTts.setLanguage("en-US");
-    await _flutterTts.setPitch(1.0);
+    try {
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setPitch(1.0);
+    } catch (e) {
+      debugPrint('TTS Init Error: $e');
+    }
   }
 
   Future<void> speak(String text) async {
@@ -198,8 +211,20 @@ class AppProvider with ChangeNotifier {
   }
 
   void setAvatarUrl(String? url) {
-    _avatarUrl = url;
-    Hive.box('settings').put('avatarUrl', url);
+    if (url != null && url.isNotEmpty) {
+      // Add a timestamp query parameter to bypass potential CDN/local caching
+      final cacheBuster = 'cb=${DateTime.now().millisecondsSinceEpoch}';
+      _avatarUrl = url.contains('?') ? '$url&$cacheBuster' : '$url?$cacheBuster';
+    } else {
+      _avatarUrl = null;
+    }
+    Hive.box('settings').put('avatarUrl', _avatarUrl);
+    notifyListeners();
+  }
+
+  void setAiModel(String model) {
+    _selectedAiModel = model;
+    Hive.box('settings').put('selectedAiModel', model);
     notifyListeners();
   }
 
@@ -222,23 +247,47 @@ class AppProvider with ChangeNotifier {
   Future<void> useCurrentLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
+      if (!serviceEnabled) {
+        debugPrint('Location services are disabled.');
+        return;
+      }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return;
+        if (permission == LocationPermission.denied) {
+          debugPrint('Location permissions are denied');
+          return;
+        }
       }
       
-      if (permission == LocationPermission.deniedForever) return;
+      if (permission == LocationPermission.deniedForever) {
+        debugPrint('Location permissions are permanently denied, we cannot request permissions.');
+        return;
+      }
 
-      Position position = await Geolocator.getCurrentPosition();
+      // On web, sometimes it's better to use a timeout
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 10),
+      );
+      
       _lat = position.latitude;
       _lon = position.longitude;
 
-      List<Placemark> placemarks = await placemarkFromCoordinates(_lat, _lon);
-      if (placemarks.isNotEmpty) {
-        _locationName = placemarks[0].locality ?? placemarks[0].administrativeArea ?? 'My Farm';
+      if (!kIsWeb) {
+        try {
+          List<Placemark> placemarks = await placemarkFromCoordinates(_lat, _lon);
+          if (placemarks.isNotEmpty) {
+            _locationName = placemarks[0].locality ?? placemarks[0].administrativeArea ?? 'My Farm';
+          }
+        } catch (e) {
+          debugPrint('Geocoding error: $e');
+          _locationName = 'Current Location';
+        }
+      } else {
+        // Fallback for web since geocoding package doesn't support it
+        _locationName = 'Browser Location';
       }
       
       Hive.box('settings').put('lat', _lat);
@@ -249,29 +298,39 @@ class AppProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Location error: $e');
+      // If it fails on web, we might still want to try to fetch weather with default or last known
     }
   }
 
-  final Map<String, Map<String, String>> _diseaseData = {
+  final Map<String, Map<String, dynamic>> _diseaseData = {
     'Black Rot': {
       'description': 'A serious bacterial disease causing V-shaped yellow lesions on leaf margins.',
-      'treatment': 'Use disease-free seeds, rotate crops, and apply copper-based fungicides.',
+      'symptoms': '• V-shaped yellow lesions on leaf edges\n• Darkening of leaf veins (blackening)\n• Stunted plant growth\n• Head rot in severe cases',
+      'causes': '• Bacterial pathogen Xanthomonas campestris\n• High humidity and warm temperatures\n• Spread via water splashes and infected seeds',
+      'prevention': '• Use certified disease-free seeds\n• Practice 3-year crop rotation\n• Control cruciferous weeds',
+      'treatment': '• Apply copper-based fungicides\n• Remove and destroy infected plants immediately\n• Avoid working in the field when wet',
       'twi_name': 'Black Rot Yadeɛ',
       'twi_description': 'Yadeɛ yi firi mmoawa bi a ɛma nhaban no ano yɛ akokoɔsradeɛ na ɛporɔ.',
       'twi_treatment': 'Fa aba a ho tɛ, sesa nnɔbae no, na fa nnuru a kɔperea wom gu so.',
       'image': 'assets/images/c2.jpg'
     },
     'Downy Mildew': {
-      'description': 'A fungal disease appearing as yellow spots on top of leaves and white mold underneath.',
-      'treatment': 'Improve air circulation, avoid overhead watering, and use appropriate fungicides.',
+      'description': 'A fungal-like disease appearing as yellow spots on top of leaves and white mold underneath.',
+      'symptoms': '• Small yellow patches on upper leaf surfaces\n• White, fuzzy mold growth on leaf undersides\n• Leaves turning brown and paper-like\n• Seedling death',
+      'causes': '• Oomycete pathogen Hyaloperonospora parasitica\n• Cool, wet weather conditions\n• Poor air circulation between plants',
+      'prevention': '• Space plants for better air flow\n• Avoid overhead irrigation (use drip)\n• Plant resistant varieties',
+      'treatment': '• Use fungicides containing Mancozeb or Metalaxyl\n• Improve field drainage\n• Harvest early if infection starts',
       'twi_name': 'Downy Mildew Yadeɛ',
       'twi_description': 'Yadeɛ yi ma nhaban no so yɛ nsuwa-nsuwa akokoɔsradeɛ na ase yɛ mfutuo fitaa.',
       'twi_treatment': 'Ma mframa mbɔ mu yiye, mma nsuo nka nhaban no so pii, na fa nnuru a ɛfata gu so.',
       'image': 'assets/images/c3.jpg'
     },
-    'Alternaria Spot': {
+    'Alternaria Leaf Spot': {
       'description': 'Caused by Alternaria fungi, resulting in small, dark spots that often develop a target-like appearance.',
-      'treatment': 'Practice crop rotation, use clean seed, and apply appropriate fungicides if severe.',
+      'symptoms': '• Small dark circular spots on older leaves\n• Concentric rings within spots (target appearance)\n• Yellowing around the spots\n• Premature leaf drop',
+      'causes': '• Fungi Alternaria brassicicola or A. brassicae\n• Warm temperatures with frequent rain\n• Spread by wind and water splash',
+      'prevention': '• Crop rotation with non-brassica crops\n• Prompt removal of crop debris\n• Use high-quality, treated seeds',
+      'treatment': '• Apply chlorothalonil or copper fungicides\n• Avoid overhead watering late in the day\n• Balanced fertilization to maintain plant vigor',
       'twi_name': 'Alternaria Spot Yadeɛ',
       'twi_description': 'Yadeɛ yi firi mmoawa a ɛma nhaban no so yɛ ntokuro ntokuro kɔkɔɔ anaa tuntum.',
       'twi_treatment': 'Sesa nnɔbae no, fa aba a ho tɛ yɛ adwuma, na fa nnuru a ɛfata gu so.',
@@ -279,7 +338,10 @@ class AppProvider with ChangeNotifier {
     },
     'Healthy': {
       'description': 'The cabbage leaf appears healthy with no visible signs of disease.',
-      'treatment': 'Continue regular monitoring and maintain good agricultural practices.',
+      'symptoms': '• Vibrant green color\n• Firm leaf texture\n• No spots or discolorations\n• Strong, upright stems',
+      'causes': '• Optimal growing conditions\n• Good nutrient management\n• Effective pest and disease control',
+      'prevention': '• Maintain regular scouting schedule\n• Ensure consistent watering\n• Regular soil testing',
+      'treatment': '• Continue regular monitoring\n• Maintain good agricultural practices\n• Apply preventative organic neem spray',
       'twi_name': 'Nhyehyɛe Pa',
       'twi_description': 'Kabeji nhaban yi ho yɛ, yadeɛ biara nni ho.',
       'twi_treatment': 'Kɔ so hwɛ wo nnɔbae no so yiye na kɔ so yɛ adwuma pa.',
@@ -287,10 +349,21 @@ class AppProvider with ChangeNotifier {
     },
   };
 
-  Future<File?> _cropImage(String path, BuildContext context) async {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+  Map<String, dynamic>? getDiseaseDetails(String diseaseName) {
+    // Handle Twi names by finding the English key
+    if (_language == 'Twi') {
+      for (var entry in _diseaseData.entries) {
+        if (entry.value['twi_name'] == diseaseName) {
+          return entry.value;
+        }
+      }
+    }
+    return _diseaseData[diseaseName];
+  }
 
+
+  Future<io.File?> _cropImage(String path, ThemeData theme, ColorScheme colorScheme) async {
+    if (kIsWeb) return null; // Image cropper might not support web in this direct way
     try {
       final croppedFile = await ImageCropper().cropImage(
         sourcePath: path,
@@ -326,7 +399,7 @@ class AppProvider with ChangeNotifier {
         ],
       );
       if (croppedFile != null) {
-        return File(croppedFile.path);
+        return io.File(croppedFile.path);
       }
     } catch (e) {
       debugPrint('Cropping error: $e');
@@ -335,6 +408,9 @@ class AppProvider with ChangeNotifier {
   }
 
   Future<void> pickImage(ImageSource source, BuildContext context) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     try {
       final XFile? pickedFile = await _picker.pickImage(source: source);
       
@@ -342,8 +418,14 @@ class AppProvider with ChangeNotifier {
         // Essential delay to prevent race condition on some Android devices
         await Future.delayed(const Duration(milliseconds: 300));
         
-        final croppedFile = await _cropImage(pickedFile.path, context);
-        if (croppedFile == null) return; 
+        String imagePath = pickedFile.path;
+        io.File? finalImage;
+
+        if (!kIsWeb) {
+          finalImage = await _cropImage(pickedFile.path, theme, colorScheme);
+          if (finalImage == null) return;
+          imagePath = finalImage.path;
+        }
 
         _isLoading = true;
         _currentPrediction = null;
@@ -354,27 +436,33 @@ class AppProvider with ChangeNotifier {
         _analysisMessage = 'EXTRACTING FEATURES...';
         notifyListeners();
         
-        final result = await _tfLiteService.classifyImage(croppedFile.path);
+        // Pass the image path as a string, but the service now handles bytes internally
+        final result = await _tfLiteService.classifyImage(imagePath);
         
         await Future.delayed(const Duration(milliseconds: 500));
         _analysisMessage = 'MODEL DECIDING...';
         notifyListeners();
 
-        final directory = await getApplicationDocumentsDirectory();
-        final fileName = 'scan_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final savedImage = await croppedFile.copy('${directory.path}/$fileName');
-        _selectedImage = savedImage;
+        if (!kIsWeb) {
+          final directory = await getApplicationDocumentsDirectory();
+          final fileName = 'scan_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          final savedImage = await finalImage!.copy('${directory.path}/$fileName');
+          _selectedImage = savedImage;
+          imagePath = savedImage.path;
+        } else {
+           imagePath = pickedFile.path; // Web uses blob URLs
+        }
 
         if (result != null) {
           if (result['isLeaf'] == false) {
             _currentPrediction = Prediction(
-              diseaseName: _language == 'Twi' ? 'Ɛnyɛ nhaban' : 'Not a Leaf',
+              diseaseName: _language == 'Twi' ? 'Mfomsoɔ' : 'Invalid Image',
               confidence: result['confidence'],
               description: _language == 'Twi' 
-                  ? 'Mfonini a woyiiɛ no nsɛ kabeji nhaban anaa ɛnyɛ fann. Yɛpa wo kyɛw scan kabeji nhaban a ɛfata na fann. Yɛn AI no hu kabeji nhaban nko ara mprempren.' 
+                  ? 'Mfonini a woyiiɛ no nsɛ kabeji nhaban anaa ɛnyɛ fann. Yɛpa wo kyɛw scan kabeji nhaban a ɛfata na fann.' 
                   : 'The image captured does not look like a cabbage leaf or is not clear enough. Please try again with a clear photo of a cabbage leaf.',
               treatment: _language == 'Twi' ? 'Sane yɛ mfonini foforɔ.' : 'Please retake the photo.',
-              imagePath: savedImage.path,
+              imagePath: imagePath,
               dateTime: DateTime.now(),
               isAsset: false,
               isLeaf: false,
@@ -389,28 +477,44 @@ class AppProvider with ChangeNotifier {
               confidence: confidence,
               description: _language == 'Twi' ? (data?['twi_description'] ?? 'Ankyerɛmu biara nni hɔ') : (data?['description'] ?? 'Unknown'),
               treatment: _language == 'Twi' ? (data?['twi_treatment'] ?? 'Ayaresa biara nni hɔ') : (data?['treatment'] ?? 'No treatment info available.'),
-              imagePath: savedImage.path,
+              imagePath: imagePath,
               dateTime: DateTime.now(),
               isAsset: false,
               isLeaf: true,
             );
-            
-            _history.insert(0, _currentPrediction!);
-            _saveHistory();
-            
-            if (!isGuest) {
-              await _supabaseService.saveScan(_currentPrediction!, savedImage);
-              await syncWithCloud();
-            }
-            _checkAndNotifyAnalytics();
           }
+          
+          // 1. Update local state immediately
+          _history.insert(0, _currentPrediction!);
+          _saveHistory();
+          _checkAndNotifyAnalytics();
+          
+          // 2. Stop loading so UI can navigate to ResultScreen
+          _isLoading = false;
+          notifyListeners();
+
+          // 3. Save to cloud in the background WITHOUT blocking the UI
+          if (!isGuest) {
+            final scanToSave = _currentPrediction!;
+            final pathForCloud = imagePath;
+            
+            pickedFile.readAsBytes().then((bytes) {
+              _supabaseService.saveScan(scanToSave, pathForCloud, bytes).then((_) {
+                debugPrint('Cloud save successful');
+                syncWithCloud();
+              }).catchError((e) {
+                debugPrint('Cloud save failed: $e');
+              });
+            });
+          }
+          return; // Exit early to skip the generic _isLoading = false in finally
         } else {
           _currentPrediction = Prediction(
             diseaseName: _language == 'Twi' ? 'Mfomsoɔ' : 'Analysis Error',
             confidence: 0.0,
             description: _language == 'Twi' ? 'Yɛantumi anhunu yadeɛ no. Yɛpa wo kyɛw sane bɔ mmɔden.' : 'We could not analyze the image. Please try again.',
             treatment: _language == 'Twi' ? 'Sane yɛ mfonini foforɔ.' : 'Please retake the photo.',
-            imagePath: savedImage.path,
+            imagePath: imagePath,
             dateTime: DateTime.now(),
             isAsset: false,
           );
@@ -428,8 +532,10 @@ class AppProvider with ChangeNotifier {
         isAsset: false,
       );
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -500,31 +606,26 @@ class AppProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateAvatar(File imageFile) async {
-    final url = await _supabaseService.uploadAvatar(imageFile);
-    if (url != null) {
-      final profile = await _supabaseService.fetchUserProfile();
-      if (profile != null) {
-        await _supabaseService.updateUserProfile(
-          firstName: profile['first_name'],
-          surname: profile['surname'],
-          profession: profile['profession'],
-          region: profile['region'],
-          phone: profile['phone_number'],
-          avatarUrl: url,
-        );
+  Future<void> updateAvatar(XFile file) async {
+    try {
+      final bytes = await file.readAsBytes();
+      final url = await _supabaseService.uploadAvatar(file.path, bytes);
+      if (url != null) {
+        await _supabaseService.updateAvatarUrl(url);
         setAvatarUrl(url);
+        debugPrint('Avatar updated successfully: $url');
       }
+    } catch (e) {
+      debugPrint('Error updating avatar: $e');
+      rethrow;
     }
   }
 
   Future<void> signOut() async {
     await _supabaseService.signOut();
     setGuestUser();
-    _history.clear();
-    _schedules.clear();
-    _saveHistory();
-    _saveSchedules();
+    // Load guest history immediately
+    await _loadUserHistoryAndSchedules();
     notifyListeners();
   }
 
@@ -540,9 +641,9 @@ class AppProvider with ChangeNotifier {
       await _supabaseService.deleteScan(prediction.imagePath);
     }
 
-    if (!prediction.isAsset) {
+    if (!prediction.isAsset && !kIsWeb) {
       try {
-        final file = File(prediction.imagePath);
+        final file = io.File(prediction.imagePath);
         if (file.existsSync()) {
           file.deleteSync();
         }
@@ -569,9 +670,10 @@ class AppProvider with ChangeNotifier {
   }
 
   void _saveHistory() {
+    final userId = _supabaseService.currentUser?.id ?? 'guest';
     final historyBox = Hive.box('scan_history');
     final historyData = _history.map((e) => e.toMap()).toList();
-    historyBox.put('history', historyData);
+    historyBox.put('history_$userId', historyData);
   }
 
   Future<void> addSchedule(Schedule schedule) async {
@@ -598,21 +700,28 @@ class AppProvider with ChangeNotifier {
   }
 
   void _saveSchedules() {
+    final userId = _supabaseService.currentUser?.id ?? 'guest';
     final scheduleBox = Hive.box('schedules');
     final scheduleData = _schedules.map((e) => e.toMap()).toList();
-    scheduleBox.put('list', scheduleData);
+    scheduleBox.put('list_$userId', scheduleData);
   }
 
-  Future<String> askGemini(String prompt) async {
+  Future<String> askAi(String prompt) async {
     _isChatLoading = true;
     notifyListeners();
     try {
-      final reply = await _supabaseService.askGemini(prompt);
-      return reply;
+      if (_selectedAiModel == 'Llama') {
+        return await _supabaseService.askLlama(prompt);
+      }
+      return await _supabaseService.askGemini(prompt);
     } finally {
       _isChatLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<String> askGemini(String prompt) async {
+    return askAi(prompt); // Maintain backward compatibility
   }
 
   String tr(String key) {
@@ -697,11 +806,8 @@ class AppProvider with ChangeNotifier {
       'SMART SUGGESTION FOR': 'AFUTUO MA',
       'Farm Planner': 'Afuo Nhyehyɛe',
       'Delete Schedule?': 'Popa Nhyehyɛe?',
-      'Schedule deleted permanently': 'Yɛapopa nhyehyɛe no koraa',
-      'CROP CARE TIP': 'AFUTUO PA',
-      'Upcoming Schedule': 'Hyehyɛɛ a ɛreba',
+      'Schedule deleted permanently': 'YƐapopa nhyehyɛe no koraa',
       'Plan More': 'Hyehyɛ foforɔ',
-      'No tasks scheduled.': 'Hyehyɛɛ biara nni hɔ.',
       'Recent Activity': 'Nhwehwɛmu a atwam',
       'See All': 'Hwɛ ne nyinaa',
       'Scan Analytics': 'Nhwehwɛmu akontaabuo',
@@ -716,11 +822,6 @@ class AppProvider with ChangeNotifier {
       'EXPERT CHOICE': 'AFUTUO PA',
       'For': 'Ma',
       'Click to plan it below.': 'Pia ase ha na hyehyɛ.',
-      'Scanning': 'NhwehwƐmu',
-      'Watering': 'Nsuo gu',
-      'Pruning': 'Nhyehyɛe',
-      'Fertilizing': 'Duane gu',
-      'Pest Control': 'Mmoawa kum',
       'Use AI to check for diseases early.': 'Fa AI hwehwɛ yadeɛ mu ntɛm.',
       'Maintain consistent soil moisture.': 'Hwɛ sɛ nsuo wɔ asase no mu.',
       'Remove damaged or infected parts.': 'Tu nhaban a ayɛ yadeɛ gu.',
@@ -748,6 +849,22 @@ class AppProvider with ChangeNotifier {
       'Use organic neem spray if needed': 'Fa neem spray gu so',
       'No upcoming tasks.': 'Hyehyɛɛ biara nni hɔ.',
       'Selected Scans Deleted': 'Nhwehwɛmu a woapaw no yɛapopa',
+      'SYMPTOMS': 'YADEƐ NO NGYINAEƐ',
+      'CAUSES': 'DEƐ ƐDE BA',
+      'PREVENTION': 'SƐNEA YƐSIW KWAN',
+      'Disease Info': 'Yadeɛ Ho Asɛm',
+      'View Detailed Disease Info': 'Hwɛ Yadeɛ no ho asɛm pii',
+      'AI ANALYSIS REPORT': 'AI NHWEHWƐMU AMANNEƐBƆ',
+      'User Guide': 'Mmoa',
+      'How to Use the App': 'Sɛnea wɔde App no di dwuma',
+      'Capture Image': 'Yi Mfonini',
+      'Use the camera to take a clear photo of the cabbage leaf.': 'Fa kamera no yi kabeji nhaban no mfonini a emu yɛ fann.',
+      'Upload': 'Upload',
+      'Select a cabbage leaf image from your gallery.': 'Paw kabeji nhaban mfonini firi wo mfonini adaka mu.',
+      'Wait': 'Twɛn kakra',
+      'Our AI analyzes the biological features of the leaf.': 'Yɛn AI no bɛhwehwɛ nhaban no mu yiye.',
+      'View Result': 'Hwɛ deɛ ɛfiri mu baeɛ',
+      'Get instant diagnosis and treatment recommendations.': 'Nya yadeɛ no din ne snea wɔsa no ntɛm paa.',
     };
 
     return twiMap[key] ?? key;

@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -45,17 +46,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context);
-    final history = provider.history;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final history = provider.history;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          _buildSliverAppBar(context, provider, history, colorScheme, isDark),
+          _buildSliverAppBar(context, provider, history, colorScheme),
           if (history.isEmpty)
             _buildEmptyState(provider, colorScheme)
           else
@@ -66,7 +66,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   (context, index) {
                     final item = history[index];
                     final isSelected = _selectedItems.contains(item);
-                    return _buildHistoryItem(context, provider, item, isSelected, isDark, colorScheme);
+                    return _buildHistoryItem(context, provider, item, isSelected, theme, colorScheme);
                   },
                   childCount: history.length,
                 ),
@@ -74,82 +74,104 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
         ],
       ),
-      floatingActionButton: _isSelectionMode ? FloatingActionButton.extended(
+      floatingActionButton: _isSelectionMode ? FloatingActionButton(
         onPressed: () => _deleteSelected(provider),
-        backgroundColor: Colors.redAccent,
-        icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
-        label: Text(provider.tr('DELETE'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFFD32F2F),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: const Icon(Icons.delete_sweep_rounded),
       ) : null,
     );
   }
 
-  Widget _buildSliverAppBar(BuildContext context, AppProvider provider, List<Prediction> history, ColorScheme colorScheme, bool isDark) {
+  Widget _buildSliverAppBar(BuildContext context, AppProvider provider, List<Prediction> history, ColorScheme colorScheme) {
     return SliverAppBar(
-      expandedHeight: 140,
+      expandedHeight: 120,
       pinned: true,
-      stretch: true,
-      backgroundColor: _isSelectionMode ? Colors.redAccent : colorScheme.primary,
+      backgroundColor: _isSelectionMode ? const Color(0xFFD32F2F) : colorScheme.primary,
       elevation: 0,
-      leading: IconButton(
-        icon: Icon(_isSelectionMode ? Icons.close : Icons.arrow_back_ios_new_rounded, color: Colors.white),
-        onPressed: () {
-          if (_isSelectionMode) {
-            setState(() { _isSelectionMode = false; _selectedItems.clear(); });
-          } else {
-            Navigator.pop(context);
-          }
-        },
+      surfaceTintColor: Colors.transparent,
+      centerTitle: true,
+      leading: Padding(
+        padding: const EdgeInsets.only(left: 8.0),
+        child: IconButton(
+          icon: Icon(_isSelectionMode ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          onPressed: () {
+            if (_isSelectionMode) {
+              setState(() { _isSelectionMode = false; _selectedItems.clear(); });
+            } else {
+              Navigator.pop(context);
+            }
+          },
+        ),
       ),
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
         title: Text(
-          _isSelectionMode ? '${_selectedItems.length} ${provider.tr('Selected')}' : provider.tr('Scan History'),
-          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 18, letterSpacing: -0.5),
+          _isSelectionMode ? '${_selectedItems.length} SELECTED' : provider.tr('Scan History').toUpperCase(),
+          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 10, letterSpacing: 3),
         ),
         background: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
               colors: _isSelectionMode 
-                ? [Colors.redAccent, Colors.red.shade900]
-                : [colorScheme.primary, colorScheme.secondary],
+                ? [const Color(0xFFB71C1C), const Color(0xFFD32F2F)]
+                : [colorScheme.primary.withValues(alpha: 0.8), colorScheme.primary],
             ),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -20,
-                bottom: -20,
-                child: Icon(
-                  _isSelectionMode ? Icons.delete_forever_rounded : Icons.history_edu_rounded, 
-                  size: 150, 
-                  color: Colors.white.withOpacity(0.1)
-                ),
-              ),
-            ],
           ),
         ),
       ),
       actions: [
         if (history.isNotEmpty) ...[
-          if (_isSelectionMode)
-            IconButton(
-              icon: Icon(_selectedItems.length == history.length ? Icons.deselect : Icons.select_all, color: Colors.white),
-              onPressed: () => _selectAll(history),
-            )
-          else
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: Colors.white),
-              onSelected: (value) {
-                if (value == 'select') setState(() => _isSelectionMode = true);
-                else if (value == 'delete_all') _deleteAll(provider);
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(value: 'select', child: Text(provider.tr('Select Scans'))),
-                PopupMenuItem(value: 'delete_all', child: Text(provider.tr('Delete All'), style: const TextStyle(color: Colors.redAccent))),
-              ],
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: _isSelectionMode
+              ? IconButton(
+                  icon: Icon(_selectedItems.length == history.length ? Icons.deselect_rounded : Icons.select_all_rounded, color: Colors.white, size: 20),
+                  onPressed: () => _selectAll(history),
+                )
+              : Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Theme.of(context).brightness == Brightness.light ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: () => provider.toggleTheme(Theme.of(context).brightness == Brightness.light),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 22),
+                      onSelected: (value) {
+                        if (value == 'select') {
+                          setState(() => _isSelectionMode = true);
+                        } else if (value == 'delete_all') {
+                          _deleteAll(provider);
+                        }
+                      },
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      itemBuilder: (context) => [
+                        PopupMenuItem(value: 'select', child: Text(provider.tr('Select Scans'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black))),
+                        PopupMenuItem(value: 'delete_all', child: Text(provider.tr('Delete All'), style: const TextStyle(color: Color(0xFFD32F2F), fontSize: 14, fontWeight: FontWeight.w600))),
+                      ],
+                    ),
+                  ],
+                ),
+          ),
+        ] else ...[
+          IconButton(
+            icon: Icon(
+              Theme.of(context).brightness == Brightness.light ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+              color: Colors.white,
+              size: 20,
             ),
+            onPressed: () => provider.toggleTheme(Theme.of(context).brightness == Brightness.light),
+          ),
+          const SizedBox(width: 8),
         ]
       ],
     );
@@ -161,38 +183,41 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history_rounded, size: 80, color: colorScheme.outlineVariant),
+            Icon(Icons.history_rounded, size: 64, color: colorScheme.primary.withValues(alpha: 0.1)),
             const SizedBox(height: 16),
-            Text(provider.tr('No history yet.'), style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            Text(provider.tr('No history yet.'), style: const TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHistoryItem(BuildContext context, AppProvider provider, Prediction item, bool isSelected, bool isDark, ColorScheme colorScheme) {
+  Widget _buildHistoryItem(BuildContext context, AppProvider provider, Prediction item, bool isSelected, ThemeData theme, ColorScheme colorScheme) {
     final isHealthy = item.diseaseName.toLowerCase().contains('healthy') || item.diseaseName.contains('Nhyehy');
-    final statusColor = isHealthy ? Colors.green : (item.diseaseName.contains('Not a') ? Colors.redAccent : Colors.orange);
+    final statusColor = isHealthy ? const Color(0xFF2E7D32) : const Color(0xFFD32F2F);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: isSelected ? colorScheme.primary : Colors.grey.withOpacity(0.1), width: 2),
-        boxShadow: [if (!isSelected) BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+        color: isSelected ? colorScheme.primary.withValues(alpha: 0.1) : theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isSelected ? colorScheme.primary : colorScheme.onSurface.withValues(alpha: 0.05)),
+        boxShadow: [
+          if (!isSelected) BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))
+        ],
       ),
       child: InkWell(
         onLongPress: () => _toggleSelection(item),
         onTap: () {
-          if (_isSelectionMode) _toggleSelection(item);
-          else {
+          if (_isSelectionMode) {
+            _toggleSelection(item);
+          } else {
             provider.setCurrentPrediction(item);
             Navigator.push(context, MaterialPageRoute(builder: (context) => const ResultScreen()));
           }
         },
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -201,32 +226,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Checkbox(
                   value: isSelected,
                   onChanged: (val) => _toggleSelection(item),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  activeColor: colorScheme.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                 ),
                 const SizedBox(width: 8),
               ],
-              Hero(
-                tag: item.imagePath,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: SizedBox(width: 70, height: 70, child: _buildImage(item)),
-                ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(width: 56, height: 56, child: _buildImage(item)),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.diseaseName, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                    Text(item.diseaseName, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: colorScheme.onSurface)),
                     const SizedBox(height: 4),
-                    Text(DateFormat('MMM dd, yyyy • hh:mm a').format(item.dateTime), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text(DateFormat('MMM dd, yyyy • hh:mm a').format(item.dateTime), style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.3), fontSize: 11, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                child: Text('${(item.confidence * 100).toInt()}%', style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 12)),
+                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                child: Text('${(item.confidence * 100).toInt()}%', style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 11)),
               ),
             ],
           ),
@@ -236,12 +259,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildImage(Prediction scan) {
-    if (scan.isAsset) return Image.asset(scan.imagePath, fit: BoxFit.cover);
-    if (scan.isNetwork || scan.imagePath.startsWith('http')) {
-      return Image.network(scan.imagePath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image));
+    if (scan.isAsset) {
+      return Image.asset(scan.imagePath, fit: BoxFit.cover);
     }
-    final file = File(scan.imagePath);
-    return file.existsSync() ? Image.file(file, fit: BoxFit.cover) : const Icon(Icons.image_not_supported);
+    if (scan.isNetwork || scan.imagePath.startsWith('http') || scan.imagePath.startsWith('blob:')) {
+      return Image.network(scan.imagePath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_rounded, color: Colors.grey)));
+    }
+    if (kIsWeb) {
+      return Image.network(scan.imagePath, fit: BoxFit.cover);
+    }
+    final file = io.File(scan.imagePath);
+    return file.existsSync() ? Image.file(file, fit: BoxFit.cover) : const Center(child: Icon(Icons.image_not_supported_rounded, color: Colors.grey));
   }
 
   Future<void> _deleteSelected(AppProvider provider) async {

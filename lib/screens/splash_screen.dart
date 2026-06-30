@@ -18,19 +18,22 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _navigateToNext() async {
-    await Future.delayed(const Duration(seconds: 4));
+    await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
 
-    final session = Supabase.instance.client.auth.currentSession;
+    Session? session;
+    try {
+      session = Supabase.instance.client.auth.currentSession;
+    } catch (e) {
+      debugPrint('Supabase Session Error: $e');
+    }
     
     if (session != null) {
-      // User is already logged in, go to Home
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
     } else {
-      // No session, check if it's the first time for onboarding
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const OnboardingScreen()),
@@ -41,92 +44,87 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFFFFFF),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset('assets/images/c9.jpg', fit: BoxFit.cover),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.4),
-                  Colors.black.withOpacity(0.7),
-                  Colors.black.withOpacity(0.9),
-                ],
-              ),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Hero(
+                  tag: 'app_logo',
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(30),
+                      child: Image.asset(
+                        'assets/images/c10.jpg',
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 40.0),
+                  child: Text(
+                    'Cabbage disease classification app',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1B5E20),
+                      letterSpacing: -0.5,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Your AI Farm Assistant',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black.withValues(alpha: 0.4),
+                  ),
+                ),
+              ],
             ),
           ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 140,
-                height: 140,
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withOpacity(0.5)),
-                ),
-                child: ClipOval(
-                  child: Image.asset('assets/images/c7.jpg', fit: BoxFit.cover),
-                ),
-              ),
-              const SizedBox(height: 30),
-              const Text(
-                'Cabbage Doctor',
-                style: TextStyle(
-                  fontSize: 42,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: -1,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'AI-Powered Crop Protection',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.white.withOpacity(0.8),
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 60),
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                strokeWidth: 3,
-              ),
-            ],
-          ),
           Positioned(
-            bottom: 60,
+            bottom: 64,
             left: 0,
             right: 0,
             child: Column(
               children: [
-                Center(
-                  child: Text(
-                    'Empowering Ghanaian Farmers'.toUpperCase(),
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 3,
-                    ),
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFBC02D)),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Center(
-                  child: Text(
-                    'v1.0.0',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.3),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                const SizedBox(height: 48),
+                Text(
+                  'POWERED BY UENR IT',
+                  style: TextStyle(
+                    color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
                   ),
                 ),
               ],

@@ -8,7 +8,7 @@
   <meta name="description" content="A mobile application for cabbage disease classification using deep learning.">
 
   <!-- iOS meta tags & icons -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="cabby">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -19,31 +19,11 @@
   <title>cabby</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Google Sign-In Client ID -->
-  <meta name="google-signin-client_id" content="303496929969-l0uom78g74j9s2it6v0v6onp5m9g3v5v.apps.googleusercontent.com">
-
-  <script>
-    // The value below is injected by flutter build post-process.
-    var serviceWorkerVersion = null;
-  </script>
-  <!-- This script adds the flutter initialization JS code -->
-  <script src="flutter.js" defer></script>
+  <!-- Image Cropper Dependencies -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 </head>
 <body>
-  <script>
-    window.addEventListener('load', function(ev) {
-      // Download main.dart.js
-      _flutter.loader.loadEntrypoint({
-        serviceWorker: {
-          serviceWorkerVersion: serviceWorkerVersion,
-        },
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            appRunner.runApp();
-          });
-        }
-      });
-    });
-  </script>
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

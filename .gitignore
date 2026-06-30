@@ -40,6 +40,6 @@ app.*.map.json
 /android/app/release
 
 # Environment secrets
-cab.env
+assets/cab.env
 .env
 google-services.json

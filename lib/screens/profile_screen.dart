@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../services/app_provider.dart';
 import '../services/supabase_service.dart';
 
@@ -30,7 +28,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _userEmail;
   bool _isEditing = false;
   bool _isLoading = true;
-  bool _isLocationLoading = false;
 
   final List<String> _professions = [
     'Crop Farmer', 'Commercial Farmer', 'Backyard Gardener',
@@ -58,6 +55,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final profile = await _supabaseService.fetchUserProfile();
       _userEmail = _supabaseService.currentUser?.email;
       if (profile != null) {
+        if (mounted) {
+          final provider = Provider.of<AppProvider>(context, listen: false);
+          if (profile['avatar_url'] != null && profile['avatar_url'].toString().isNotEmpty) {
+            provider.setAvatarUrl(profile['avatar_url']);
+          }
+        }
         setState(() {
           _firstNameController.text = profile['first_name'] ?? '';
           _surnameController.text = profile['surname'] ?? '';
@@ -72,6 +75,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() => _isLoading = false);
       }
     } catch (e) {
+      debugPrint('Error loading profile: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -90,41 +94,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (pickedFile != null) {
       setState(() => _isLoading = true);
       try {
+        if (!mounted) return;
         final provider = Provider.of<AppProvider>(context, listen: false);
-        await provider.updateAvatar(File(pickedFile.path));
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo updated!')));
+        await provider.updateAvatar(pickedFile);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo updated!'), behavior: SnackBarBehavior.floating));
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = Provider.of<AppProvider>(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final provider = Provider.of<AppProvider>(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
+        ? Center(child: CircularProgressIndicator(color: colorScheme.primary, strokeWidth: 2))
         : CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              _buildSliverAppBar(context, colorScheme, provider, isDark),
+              _buildSliverAppBar(context, provider, colorScheme, theme),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 100),
                   child: Form(
                     key: _formKey,
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildStatsRow(provider, colorScheme, isDark),
-                        const SizedBox(height: 32),
-                        if (!_isEditing) _buildViewMode(theme, colorScheme, provider, isDark)
-                        else _buildEditMode(isDark, theme, colorScheme),
+                        _buildStatsRow(provider, theme, colorScheme),
+                        const SizedBox(height: 48),
+                        if (!_isEditing) _buildViewMode(provider, theme, colorScheme)
+                        else _buildEditMode(colorScheme),
                       ],
                     ),
                   ),
@@ -135,37 +141,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSliverAppBar(BuildContext context, ColorScheme colorScheme, AppProvider provider, bool isDark) {
+  Widget _buildSliverAppBar(BuildContext context, AppProvider provider, ColorScheme colorScheme, ThemeData theme) {
     return SliverAppBar(
-      expandedHeight: 340,
+      expandedHeight: 280,
       pinned: true,
-      backgroundColor: isDark ? const Color(0xFF1B2E1C) : colorScheme.primary,
-      foregroundColor: Colors.white,
+      backgroundColor: colorScheme.primary,
       elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded),
-        onPressed: () => Navigator.pop(context),
+      surfaceTintColor: Colors.transparent,
+      centerTitle: true,
+      leading: Padding(
+        padding: const EdgeInsets.only(left: 8.0),
+        child: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       actions: [
-        IconButton(
-          icon: Icon(_isEditing ? Icons.close_rounded : Icons.edit_note_rounded, size: 28),
-          onPressed: () => setState(() {
-            _isEditing = !_isEditing;
-            if (!_isEditing) _loadUserProfile();
-          }),
+        Padding(
+          padding: const EdgeInsets.only(right: 8.0),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Theme.of(context).brightness == Brightness.light ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                onPressed: () => provider.toggleTheme(Theme.of(context).brightness == Brightness.light),
+              ),
+              IconButton(
+                icon: Icon(_isEditing ? Icons.close_rounded : Icons.edit_note_rounded, size: 22, color: Colors.white),
+                onPressed: () => setState(() {
+                  _isEditing = !_isEditing;
+                  if (!_isEditing) _loadUserProfile();
+                }),
+              ),
+            ],
+          ),
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
+        centerTitle: true,
+        title: Text(
+          'Profile'.toUpperCase(),
+          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 10, letterSpacing: 3),
+        ),
         background: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                isDark ? const Color(0xFF1B2E1C) : colorScheme.primary,
-                isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF9FBF9),
-              ],
-              stops: const [0.6, 1.0],
+              colors: [colorScheme.primary.withValues(alpha: 0.8), colorScheme.primary],
             ),
           ),
           child: Column(
@@ -176,13 +202,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 alignment: Alignment.bottomRight,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white24, width: 2)),
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
                     child: CircleAvatar(
-                      radius: 65,
-                      backgroundColor: Colors.white10,
-                      backgroundImage: provider.avatarUrl != null ? NetworkImage(provider.avatarUrl!) : null,
-                      child: provider.avatarUrl == null ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
+                      key: ValueKey(provider.avatarUrl),
+                      radius: 56,
+                      backgroundColor: theme.cardColor,
+                      child: provider.avatarUrl != null 
+                        ? ClipOval(
+                            child: CachedNetworkImage(
+                              imageUrl: provider.avatarUrl!,
+                              width: 112,
+                              height: 112,
+                              fit: BoxFit.cover,
+                              cacheKey: provider.avatarUrl,
+                              placeholder: (context, url) => const CircularProgressIndicator(strokeWidth: 3, color: Colors.grey),
+                              errorWidget: (context, url, error) => Icon(Icons.person_rounded, size: 48, color: colorScheme.primary),
+                            ),
+                          )
+                        : Icon(Icons.person_rounded, size: 48, color: colorScheme.primary),
                     ),
                   ),
                   if (_isEditing)
@@ -190,21 +228,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: _pickAvatar,
                       child: Container(
                         padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: colorScheme.secondary, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
-                        child: const Icon(Icons.camera_alt_rounded, size: 18, color: Colors.white),
+                        decoration: BoxDecoration(color: colorScheme.secondary, shape: BoxShape.circle),
+                        child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.black),
                       ),
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                '${_firstNameController.text} ${_surnameController.text}',
-                style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-              ),
-              Text(
-                _selectedProfession ?? 'Dedicated Farmer',
-                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, fontWeight: FontWeight.w500),
-              ),
+              const SizedBox(height: 44),
             ],
           ),
         ),
@@ -212,67 +242,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStatsRow(AppProvider provider, ColorScheme colorScheme, bool isDark) {
+  Widget _buildStatsRow(AppProvider provider, ThemeData theme, ColorScheme colorScheme) {
     return Row(
       children: [
-        _buildStatCard('Total Scans', provider.history.length.toString(), Icons.qr_code_scanner_rounded, Colors.blue, isDark),
+        _buildStatCard('TOTAL SCANS', provider.history.length.toString(), theme, colorScheme),
         const SizedBox(width: 12),
-        _buildStatCard('Schedules', provider.schedules.length.toString(), Icons.event_available_rounded, Colors.orange, isDark),
+        _buildStatCard('FIELD TASKS', provider.schedules.length.toString(), theme, colorScheme),
         const SizedBox(width: 12),
-        _buildStatCard('Rank', provider.isGuest ? 'Free' : 'Pro', Icons.stars_rounded, Colors.amber, isDark),
+        _buildStatCard('ACCOUNT', provider.isGuest ? 'FREE' : 'PRO', theme, colorScheme),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color, bool isDark) {
+  Widget _buildStatCard(String label, String value, ThemeData theme, ColorScheme colorScheme) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 20),
+            Text(label, style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.4), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
             const SizedBox(height: 8),
-            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: colorScheme.onSurface)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildViewMode(ThemeData theme, ColorScheme colorScheme, AppProvider provider, bool isDark) {
+  Widget _buildViewMode(AppProvider provider, ThemeData theme, ColorScheme colorScheme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('PERSONAL INFORMATION'),
-        _buildInfoCard(isDark, [
-          _buildInfoRow(Icons.email_rounded, 'Email Address', _userEmail ?? 'Not Set', isDark),
-          _buildInfoRow(Icons.phone_iphone_rounded, 'Phone Number', _phoneController.text, isDark),
-          _buildInfoRow(Icons.location_on_rounded, 'Region / Location', _selectedRegion ?? 'Not Set', isDark),
-        ]),
-        const SizedBox(height: 24),
-        _buildSectionHeader('FARMING PROFILE'),
-        _buildInfoCard(isDark, [
-          _buildInfoRow(Icons.work_rounded, 'Profession', _selectedProfession ?? 'Not Set', isDark),
-          _buildInfoRow(Icons.calendar_month_rounded, 'Birth Date', _dobController.text, isDark),
-          _buildInfoRow(Icons.wc_rounded, 'Gender', _selectedGender ?? 'Not Set', isDark),
-        ]),
-        const SizedBox(height: 40),
+        _buildSectionHeader('PERSONAL INFORMATION', colorScheme),
+        const SizedBox(height: 12),
+        _buildInfoCard([
+          _buildInfoRow('Email Address', _userEmail ?? 'Not Set', colorScheme),
+          _buildInfoRow('Phone Number', _phoneController.text, colorScheme),
+          _buildInfoRow('Farm Region', _selectedRegion ?? 'Not Set', colorScheme),
+        ], theme, colorScheme),
+        const SizedBox(height: 32),
+        _buildSectionHeader('FARMING PROFILE', colorScheme),
+        const SizedBox(height: 12),
+        _buildInfoCard([
+          _buildInfoRow('Profession', _selectedProfession ?? 'Not Set', colorScheme),
+          _buildInfoRow('Birth Date', _dobController.text, colorScheme),
+          _buildInfoRow('Gender', _selectedGender ?? 'Not Set', colorScheme),
+        ], theme, colorScheme),
+        const SizedBox(height: 48),
         SizedBox(
           width: double.infinity,
           child: TextButton.icon(
             onPressed: () { provider.signOut(); Navigator.pop(context); },
-            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-            label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w900)),
+            icon: const Icon(Icons.logout_rounded, color: Color(0xFFD32F2F), size: 18),
+            label: const Text('Sign out', style: TextStyle(color: Color(0xFFD32F2F), fontWeight: FontWeight.w700)),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.all(20),
-              backgroundColor: Colors.redAccent.withOpacity(0.1),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              backgroundColor: const Color(0xFFD32F2F).withValues(alpha: 0.05),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
         ),
@@ -280,42 +311,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 12),
-      child: Text(title, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-    );
+  Widget _buildSectionHeader(String title, ColorScheme colorScheme) {
+    return Text(title, style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.4), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5));
   }
 
-  Widget _buildInfoCard(bool isDark, List<Widget> children) {
+  Widget _buildInfoCard(List<Widget> children, ThemeData theme, ColorScheme colorScheme) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
       ),
       child: Column(children: children),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, bool isDark) {
+  Widget _buildInfoRow(String label, String value, ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: (isDark ? Colors.white : Colors.black).withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: Colors.green, size: 20),
-          ),
+          Text(label, style: TextStyle(fontSize: 14, color: colorScheme.onSurface.withValues(alpha: 0.4), fontWeight: FontWeight.w600)),
           const SizedBox(width: 16),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
-                Text(value.isEmpty ? 'Not Provided' : value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
+            child: Text(
+              value.isEmpty ? 'Not Provided' : value, 
+              textAlign: TextAlign.right,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: colorScheme.onSurface),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -323,64 +347,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildEditMode(bool isDark, ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildEditMode(ColorScheme colorScheme) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildTextField('First Name', _firstNameController, Icons.person_outline, isDark),
-        const SizedBox(height: 16),
-        _buildTextField('Surname', _surnameController, Icons.badge_outlined, isDark),
-        const SizedBox(height: 16),
-        _buildTextField('Phone Number', _phoneController, Icons.phone_android_rounded, isDark, isPhone: true),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _selectedRegion,
-          decoration: _inputDecoration('Region / Location', Icons.location_on_outlined, isDark),
-          items: _regions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-          onChanged: (v) => setState(() => _selectedRegion = v),
-          validator: (v) => v == null ? 'Required' : null,
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<String>(
-          value: _selectedProfession,
-          decoration: _inputDecoration('Profession', Icons.work_outline, isDark),
-          items: _professions.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-          onChanged: (v) => setState(() => _selectedProfession = v),
-        ),
-        const SizedBox(height: 32),
+        _buildLabel('First Name', colorScheme),
+        _buildTextField(_firstNameController, colorScheme),
+        const SizedBox(height: 24),
+        _buildLabel('Surname', colorScheme),
+        _buildTextField(_surnameController, colorScheme),
+        const SizedBox(height: 24),
+        _buildLabel('Phone Number', colorScheme),
+        _buildTextField(_phoneController, colorScheme, keyboardType: TextInputType.phone),
+        const SizedBox(height: 24),
+        _buildLabel('Region', colorScheme),
+        _buildDropdown(_regions, _selectedRegion, colorScheme, (v) => setState(() => _selectedRegion = v)),
+        const SizedBox(height: 24),
+        _buildLabel('Profession', colorScheme),
+        _buildDropdownList(_professions, _selectedProfession, colorScheme, (v) => setState(() => _selectedProfession = v)),
+        const SizedBox(height: 48),
         ElevatedButton(
           onPressed: _saveProfile,
           style: ElevatedButton.styleFrom(
             backgroundColor: colorScheme.primary,
             foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 60),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            minimumSize: const Size(double.infinity, 64),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             elevation: 4,
+            shadowColor: colorScheme.primary.withValues(alpha: 0.3),
           ),
-          child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          child: const Text('Save changes', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
         ),
       ],
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, IconData icon, bool isDark, {bool isPhone = false}) {
+  Widget _buildLabel(String text, ColorScheme colorScheme) => Padding(padding: const EdgeInsets.only(bottom: 12.0, left: 4), child: Text(text, style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)));
+
+  Widget _buildTextField(TextEditingController controller, ColorScheme colorScheme, {TextInputType? keyboardType}) {
     return TextFormField(
-      controller: controller,
-      keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
-      decoration: _inputDecoration(label, icon, isDark),
-      validator: (v) => v!.isEmpty ? 'Required' : null,
+      controller: controller, keyboardType: keyboardType,
+      style: TextStyle(color: colorScheme.onSurface, fontSize: 15, fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        filled: true, fillColor: colorScheme.primary.withValues(alpha: 0.05), contentPadding: const EdgeInsets.all(20),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: colorScheme.primary.withValues(alpha: 0.1))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: colorScheme.primary, width: 2)),
+      ),
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon, bool isDark) {
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon, color: Colors.green),
-      filled: true,
-      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: Colors.grey.withOpacity(0.1))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: Colors.grey.withOpacity(0.1))),
+  Widget _buildDropdown(List<String> items, String? value, ColorScheme colorScheme, Function(String?) onChanged) {
+     return DropdownButtonFormField<String>(
+      initialValue: value, items: items.map((i) => DropdownMenuItem(value: i, child: Text(i, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600)))).toList(), onChanged: onChanged,
+      dropdownColor: Theme.of(context).cardColor, icon: Icon(Icons.arrow_drop_down_rounded, color: colorScheme.primary),
+      decoration: InputDecoration(
+        filled: true, fillColor: colorScheme.primary.withValues(alpha: 0.05), contentPadding: const EdgeInsets.all(20),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: colorScheme.primary.withValues(alpha: 0.1))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: colorScheme.primary, width: 2)),
+      ),
     );
   }
+
+  Widget _buildDropdownList(List<String> items, String? value, ColorScheme colorScheme, Function(String?) onChanged) => _buildDropdown(items, value, colorScheme, onChanged);
 
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
@@ -395,12 +423,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           dob: _dobController.text,
           gender: _selectedGender ?? '',
         );
+        if (!mounted) return;
         final provider = Provider.of<AppProvider>(context, listen: false);
         provider.setUserName('${_firstNameController.text} ${_surnameController.text}');
         setState(() { _isEditing = false; _isLoading = false; });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile Updated!')));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile Updated!'), behavior: SnackBarBehavior.floating));
       } catch (e) {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
