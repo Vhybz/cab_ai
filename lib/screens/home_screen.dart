@@ -26,6 +26,51 @@ class HomeScreen extends StatelessWidget {
 
   Future<void> _handleScan(BuildContext context, ImageSource source) async {
     final provider = Provider.of<AppProvider>(context, listen: false);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    // Show friendly reminder dialog before scanning
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: theme.cardColor,
+        title: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, color: colorScheme.primary),
+            const SizedBox(width: 12),
+            Text(
+              provider.tr('Cabbage Focus'),
+              style: TextStyle(fontWeight: FontWeight.w800, color: colorScheme.onSurface),
+            ),
+          ],
+        ),
+        content: Text(
+          provider.tr('To get the most accurate results, please ensure you are scanning a cabbage leaf. Other objects or non-cabbage plants might be misidentified as diseased cabbage.'),
+          style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.7), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(provider.tr('CANCEL'), style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.4))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(provider.tr('PROCEED'), style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (proceed != true) return;
+
+    if (!context.mounted) return;
     await provider.pickImage(source, context);
     if (context.mounted && provider.currentPrediction != null) {
       Navigator.push(context, MaterialPageRoute(builder: (context) => const ResultScreen()));
@@ -153,6 +198,30 @@ class HomeScreen extends StatelessWidget {
                         const LeafSlideshow(),
                         const SizedBox(height: 32),
       
+                        _buildSectionHeader('DIAGNOSTICS TOOLS', colorScheme),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(child: _buildActionCard('Camera', 'Scan Leaf', Icons.camera_rounded, colorScheme.primary, () => _handleScan(context, ImageSource.camera))),
+                            const SizedBox(width: 12),
+                            Expanded(child: _buildActionCard('Gallery', 'Upload', Icons.image_search_rounded, colorScheme.secondary, () => _handleScan(context, ImageSource.gallery))),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            provider.tr('Friendly Tip: For the best results, please take a clear photo of the leaf. Occasionally, other objects might be mistaken for a cabbage leaf.'),
+                            style: TextStyle(
+                              color: colorScheme.onSurface.withValues(alpha: 0.4),
+                              fontSize: 10,
+                              fontStyle: FontStyle.italic,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
                         _buildSectionHeader('MY FARM DASHBOARD', colorScheme),
                         const SizedBox(height: 16),
                         Row(
@@ -173,21 +242,10 @@ class HomeScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 24),
-                        _buildHomepageCharts(provider, theme, colorScheme),
-                        const SizedBox(height: 24),
                         _buildDynamicScheduleCard(context, provider, theme, colorScheme),
                         const SizedBox(height: 32),
       
-                        _buildSectionHeader('DIAGNOSTICS TOOLS', colorScheme),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(child: _buildActionCard('Camera', 'Scan Leaf', Icons.camera_rounded, colorScheme.primary, () => _handleScan(context, ImageSource.camera))),
-                            const SizedBox(width: 12),
-                            Expanded(child: _buildActionCard('Gallery', 'Upload', Icons.image_search_rounded, colorScheme.secondary, () => _handleScan(context, ImageSource.gallery))),
-                          ],
-                        ),
-      
+                        _buildHomepageCharts(provider, theme, colorScheme),
                         const SizedBox(height: 32),
       
                         if (provider.history.isNotEmpty) ...[
@@ -251,16 +309,30 @@ class HomeScreen extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: colorScheme.primary.withValues(alpha: 0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: colorScheme.primary, size: 24),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: colorScheme.primary, size: 20),
+          ),
           const SizedBox(height: 16),
-          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: colorScheme.onSurface)),
-          Text(label, style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: colorScheme.onSurface, letterSpacing: -0.5)),
+          Text(label, style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
         ],
       ),
     );
@@ -270,25 +342,46 @@ class HomeScreen extends StatelessWidget {
     final isYellow = color.computeLuminance() > 0.6;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(24),
       child: Container(
-        height: 150,
+        height: 160,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 6))],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color,
+              color.withValues(alpha: 0.8),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.3), 
+              blurRadius: 15, 
+              offset: const Offset(0, 8),
+            )
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: isYellow ? Colors.black : Colors.white, size: 28),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: (isYellow ? Colors.black : Colors.white).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: isYellow ? Colors.black : Colors.white, size: 24),
+            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(color: isYellow ? Colors.black : Colors.white, fontWeight: FontWeight.w800, fontSize: 18)),
-                Text(subtitle, style: TextStyle(color: (isYellow ? Colors.black : Colors.white).withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600)),
+                Text(title, style: TextStyle(color: isYellow ? Colors.black : Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.5)),
+                const SizedBox(height: 2),
+                Text(subtitle.toUpperCase(), style: TextStyle(color: (isYellow ? Colors.black : Colors.white).withValues(alpha: 0.6), fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1)),
               ],
             ),
           ],
@@ -311,7 +404,7 @@ class HomeScreen extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
             color: theme.cardColor,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.05)),
           ),
           child: InkWell(
@@ -319,34 +412,73 @@ class HomeScreen extends StatelessWidget {
               provider.setCurrentPrediction(scan);
               Navigator.push(context, MaterialPageRoute(builder: (context) => const ResultScreen()));
             },
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(width: 52, height: 52, child: _buildImage(scan)),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        )
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: SizedBox(width: 60, height: 60, child: _buildImage(scan)),
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(scan.diseaseName, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: colorScheme.onSurface)),
                         Text(
-                          DateFormat('MMM dd, hh:mm a').format(scan.dateTime),
-                          style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.3), fontSize: 11, fontWeight: FontWeight.w600),
+                          scan.diseaseName, 
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800, 
+                            fontSize: 16, 
+                            color: colorScheme.onSurface,
+                            letterSpacing: -0.5
+                          )
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.access_time_rounded, size: 12, color: colorScheme.onSurface.withValues(alpha: 0.3)),
+                            const SizedBox(width: 4),
+                            Text(
+                              DateFormat('MMM dd, hh:mm a').format(scan.dateTime),
+                              style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.3), fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                    child: Text(
-                      '${(scan.confidence * 100).toInt()}%',
-                      style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 11),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1), 
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: statusColor.withValues(alpha: 0.1)),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          '${(scan.confidence * 100).toInt()}%',
+                          style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 13),
+                        ),
+                        Text(
+                          'MATCH',
+                          style: TextStyle(color: statusColor.withValues(alpha: 0.5), fontWeight: FontWeight.w900, fontSize: 7, letterSpacing: 0.5),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -393,17 +525,29 @@ class HomeScreen extends StatelessWidget {
     final suggestion = provider.getSuggestedActivity(DateTime.now());
     
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: theme.cardColor.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
+        color: colorScheme.primary.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.08)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: colorScheme.primary, borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [colorScheme.primary, colorScheme.primary.withValues(alpha: 0.8)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.primary.withValues(alpha: 0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                )
+              ],
+            ),
             child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 20),
@@ -411,14 +555,39 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(suggestion, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: colorScheme.onSurface)),
-                Text('SMART RECOMMENDATION', style: TextStyle(fontSize: 10, color: colorScheme.primary.withValues(alpha: 0.5), fontWeight: FontWeight.w900, letterSpacing: 1)),
+                Text(
+                  'SMART RECOMMENDATION', 
+                  style: TextStyle(
+                    fontSize: 9, 
+                    color: colorScheme.primary, 
+                    fontWeight: FontWeight.w900, 
+                    letterSpacing: 1.5
+                  )
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  suggestion, 
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900, 
+                    fontSize: 18, 
+                    color: colorScheme.onSurface,
+                    letterSpacing: -0.5
+                  )
+                ),
               ],
             ),
           ),
-          IconButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ScheduleScreen())),
-            icon: Icon(Icons.arrow_forward_rounded, color: colorScheme.primary),
+          Material(
+            color: colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ScheduleScreen())),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(Icons.arrow_forward_ios_rounded, color: colorScheme.primary, size: 16),
+              ),
+            ),
           ),
         ],
       ),
@@ -522,12 +691,19 @@ class HomeScreen extends StatelessWidget {
         _buildSectionHeader('DISEASE INSIGHTS', colorScheme),
         const SizedBox(height: 16),
         Container(
-          height: 180,
-          padding: const EdgeInsets.all(20),
+          height: 200,
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: theme.cardColor,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(28),
             border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.05)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.01),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              )
+            ],
           ),
           child: provider.history.isEmpty
             ? Center(child: Text('No scan data yet', style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.3), fontSize: 13, fontWeight: FontWeight.w600)))
@@ -541,7 +717,7 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(10, 24, 24, 16),
           decoration: BoxDecoration(
             color: theme.cardColor,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(28),
             border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.05)),
           ),
           child: provider.history.isEmpty

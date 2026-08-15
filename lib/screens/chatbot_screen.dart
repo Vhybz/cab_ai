@@ -69,7 +69,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               physics: const BouncingScrollPhysics(),
               slivers: [
                 SliverAppBar(
-                  expandedHeight: 100,
+                  expandedHeight: 120,
                   pinned: true,
                   backgroundColor: colorScheme.primary,
                   elevation: 0,
@@ -84,58 +84,55 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                   ),
                   flexibleSpace: FlexibleSpaceBar(
                     centerTitle: true,
-                    title: Text(
-                      (isTwi ? 'Kabeji Mmoawa' : 'AI Assistant').toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 10, letterSpacing: 3),
-                    ),
-                    background: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [colorScheme.primary.withValues(alpha: 0.8), colorScheme.primary],
+                    title: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          (isTwi ? 'Kabeji Mmoawa' : 'AI Assistant').toUpperCase(),
+                          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 10, letterSpacing: 3),
                         ),
-                      ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Online'.toUpperCase(),
+                          style: TextStyle(fontWeight: FontWeight.w900, color: colorScheme.secondary, fontSize: 7, letterSpacing: 1),
+                        ),
+                      ],
+                    ),
+                    background: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [colorScheme.primary, colorScheme.primary.withValues(alpha: 0.8)],
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: -20,
+                          top: -20,
+                          child: Icon(Icons.psychology_rounded, size: 150, color: Colors.white.withValues(alpha: 0.05)),
+                        ),
+                      ],
                     ),
                   ),
                   actions: [
                     PopupMenuButton<String>(
-                      icon: const Icon(Icons.psychology_rounded, color: Colors.white),
+                      icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 20),
                       onSelected: (value) => provider.setAiModel(value),
+                      tooltip: 'Select AI Model',
                       itemBuilder: (context) => [
-                        const PopupMenuItem(value: 'Gemini', child: Text('Google Gemini')),
-                        const PopupMenuItem(value: 'Llama', child: Text('Meta Llama 3')),
+                        const PopupMenuItem(value: 'Gemini', child: Text('Google Gemini (Fast)')),
+                        const PopupMenuItem(value: 'Llama', child: Text('Meta Llama 3 (Smart)')),
                       ],
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Theme.of(context).brightness == Brightness.light ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      onPressed: () => provider.toggleTheme(Theme.of(context).brightness == Brightness.light),
                     ),
                     const SizedBox(width: 8),
                   ],
                 ),
-                SliverToBoxAdapter(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    color: colorScheme.primary.withValues(alpha: 0.1),
-                    child: Center(
-                      child: Text(
-                        'Using: ${provider.selectedAiModel}',
-                        style: TextStyle(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -160,58 +157,120 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 
   Widget _buildMessageBubble(String text, bool isBot, ThemeData theme, ColorScheme colorScheme) {
-    return Align(
-      alignment: isBot ? Alignment.centerLeft : Alignment.centerRight,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-        decoration: BoxDecoration(
-          color: isBot ? theme.cardColor : colorScheme.primary,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(isBot ? 0 : 20),
-            bottomRight: Radius.circular(isBot ? 20 : 0),
-          ),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        mainAxisAlignment: isBot ? MainAxisAlignment.start : MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (isBot) ...[
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: colorScheme.primary,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(color: colorScheme.primary.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 4))
+                ],
+              ),
+              child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 12),
           ],
-        ),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: isBot ? colorScheme.onSurface : Colors.white,
-            fontSize: 15,
-            height: 1.5,
-            fontWeight: isBot ? FontWeight.w500 : FontWeight.w600,
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                color: isBot ? theme.cardColor : colorScheme.primary,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(20),
+                  topRight: const Radius.circular(20),
+                  bottomLeft: Radius.circular(isBot ? 4 : 20),
+                  bottomRight: Radius.circular(isBot ? 20 : 4),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isBot 
+                        ? Colors.black.withValues(alpha: 0.03) 
+                        : colorScheme.primary.withValues(alpha: 0.1), 
+                    blurRadius: 12, 
+                    offset: const Offset(0, 6)
+                  )
+                ],
+              ),
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: isBot ? colorScheme.onSurface : Colors.white,
+                  fontSize: 15,
+                  height: 1.4,
+                  fontWeight: isBot ? FontWeight.w500 : FontWeight.w600,
+                ),
+              ),
+            ),
           ),
-        ),
+          if (!isBot) ...[
+            const SizedBox(width: 12),
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: colorScheme.secondary,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.person_rounded, color: Colors.black, size: 16),
+            ),
+          ],
+        ],
       ),
     );
   }
 
   Widget _buildTypingIndicator(ColorScheme colorScheme) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Text(
-          'Thinking...',
-          style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic),
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(left: 44, bottom: 20),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary.withValues(alpha: 0.5)),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Cabbage Doctor is thinking...',
+                  style: TextStyle(
+                    color: colorScheme.primary.withValues(alpha: 0.6), 
+                    fontSize: 12, 
+                    fontWeight: FontWeight.w700, 
+                    fontStyle: FontStyle.italic
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildInputArea(AppProvider provider, bool isTwi, ThemeData theme, ColorScheme colorScheme) {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 12),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -5))
-        ],
+        color: theme.scaffoldBackgroundColor,
+        border: Border(top: BorderSide(color: colorScheme.onSurface.withValues(alpha: 0.05))),
       ),
       child: Row(
         children: [
@@ -219,16 +278,17 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(24),
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.05)),
               ),
               child: TextField(
                 controller: _controller,
                 enabled: !provider.isChatLoading,
                 style: TextStyle(color: colorScheme.onSurface, fontSize: 15, fontWeight: FontWeight.w600),
                 decoration: InputDecoration(
-                  hintText: isTwi ? 'Bisa asɛm bi...' : 'Ask your question...',
-                  hintStyle: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.4)),
+                  hintText: isTwi ? 'Bisa asɛm bi...' : 'Type a message...',
+                  hintStyle: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.3)),
                   border: InputBorder.none,
                 ),
                 onSubmitted: (_) => _sendMessage(),
@@ -236,11 +296,29 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Container(
-            decoration: BoxDecoration(color: colorScheme.secondary, shape: BoxShape.circle),
-            child: IconButton(
-              onPressed: provider.isChatLoading ? null : _sendMessage,
-              icon: const Icon(Icons.send_rounded, color: Colors.black, size: 22),
+          GestureDetector(
+            onTap: provider.isChatLoading ? null : _sendMessage,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: provider.isChatLoading 
+                      ? [Colors.grey, Colors.grey.shade400] 
+                      : [colorScheme.primary, colorScheme.primary.withValues(alpha: 0.8)],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  if (!provider.isChatLoading)
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                ],
+              ),
+              child: const Icon(Icons.send_rounded, color: Colors.white, size: 22),
             ),
           ),
         ],

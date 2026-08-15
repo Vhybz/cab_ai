@@ -106,8 +106,17 @@ class TFLiteService implements TFLiteServiceInterface {
       }
       debugPrint('---------------------------------------');
 
-      const double threshold = 0.65;
+      const double threshold = 0.67;
       bool isConfident = maxScore >= threshold;
+
+      if (!isConfident) {
+        return {
+          'label': 'Unidentified / Not a Leaf',
+          'confidence': maxScore,
+          'index': 3,
+          'isLeaf': false,
+        };
+      }
 
       return {
         'label': _labels[maxIndex],

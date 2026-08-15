@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -17,9 +18,16 @@ void main() async {
     WidgetsFlutterBinding.ensureInitialized();
     
     try {
-      await dotenv.load(fileName: "assets/cab.env");
+      // On Web, the assets path is handled differently by the loader
+      const String envPath = kIsWeb ? "cab.env" : "assets/cab.env";
+      await dotenv.load(fileName: envPath);
     } catch (e) {
-      debugPrint('Warning: Could not load cab.env file: $e');
+      debugPrint('Warning: Could not load env file ($e). Trying fallback...');
+      try {
+        await dotenv.load(fileName: "assets/cab.env");
+      } catch (e2) {
+        debugPrint('Error: Environment file loading failed: $e2');
+      }
     }
     
     final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';

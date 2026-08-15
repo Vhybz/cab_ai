@@ -69,24 +69,71 @@ class SettingsScreen extends StatelessWidget {
                   _buildSectionLabel('APPEARANCE & LANGUAGE', colorScheme),
                   const SizedBox(height: 12),
                   _buildSettingsCard([
-                    SwitchListTile(
-                      activeThumbColor: colorScheme.primary,
-                      title: Text('Dark Mode', style: TextStyle(color: colorScheme.onSurface, fontSize: 15, fontWeight: FontWeight.w600)),
-                      value: provider.themeMode == ThemeMode.dark,
-                      onChanged: (val) => provider.toggleTheme(val),
+                    ListTile(
+                      leading: Icon(
+                        provider.themeMode == ThemeMode.dark 
+                            ? Icons.dark_mode_rounded 
+                            : Icons.light_mode_rounded, 
+                        color: colorScheme.primary
+                      ),
+                      title: Text(
+                        provider.tr('Dark Mode'), 
+                        style: TextStyle(
+                          color: colorScheme.onSurface, 
+                          fontSize: 15, 
+                          fontWeight: FontWeight.w700
+                        )
+                      ),
+                      subtitle: Text(
+                        provider.themeMode == ThemeMode.dark ? 'Enabled' : 'Disabled',
+                        style: TextStyle(
+                          color: colorScheme.onSurface.withValues(alpha: 0.4), 
+                          fontSize: 12, 
+                          fontWeight: FontWeight.w500
+                        ),
+                      ),
+                      trailing: Switch(
+                        activeColor: colorScheme.primary,
+                        value: provider.themeMode == ThemeMode.dark,
+                        onChanged: (val) => provider.toggleTheme(val),
+                      ),
                     ),
-                    _buildSettingsTile('Language', provider.language, colorScheme, () => _showLanguageDialog(context, provider)),
+                    _buildSettingsTile(
+                      Icons.translate_rounded,
+                      provider.tr('Language'), 
+                      provider.language, 
+                      colorScheme, 
+                      () => _showLanguageDialog(context, provider)
+                    ),
                   ], theme, colorScheme),
                   
                   const SizedBox(height: 40),
                   _buildSectionLabel('NOTIFICATIONS', colorScheme),
                   const SizedBox(height: 12),
                   _buildSettingsCard([
-                    SwitchListTile(
-                      activeThumbColor: colorScheme.primary,
-                      title: Text('Field Reminders', style: TextStyle(color: colorScheme.onSurface, fontSize: 15, fontWeight: FontWeight.w600)),
-                      value: provider.notificationsEnabled,
-                      onChanged: (val) => provider.toggleNotifications(val),
+                    ListTile(
+                      leading: Icon(Icons.notifications_active_rounded, color: colorScheme.primary),
+                      title: Text(
+                        provider.tr('Field Reminders'), 
+                        style: TextStyle(
+                          color: colorScheme.onSurface, 
+                          fontSize: 15, 
+                          fontWeight: FontWeight.w700
+                        )
+                      ),
+                      subtitle: Text(
+                        'Important farm alerts',
+                        style: TextStyle(
+                          color: colorScheme.onSurface.withValues(alpha: 0.4), 
+                          fontSize: 12, 
+                          fontWeight: FontWeight.w500
+                        ),
+                      ),
+                      trailing: Switch(
+                        activeColor: colorScheme.primary,
+                        value: provider.notificationsEnabled,
+                        onChanged: (val) => provider.toggleNotifications(val),
+                      ),
                     ),
                   ], theme, colorScheme),
 
@@ -94,9 +141,9 @@ class SettingsScreen extends StatelessWidget {
                   _buildSectionLabel('SUPPORT', colorScheme),
                   const SizedBox(height: 12),
                   _buildSettingsCard([
-                    _buildSettingsTile('Help', 'Step-by-step instructions', colorScheme, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const HelpScreen()))),
-                    _buildSettingsTile('Help Center', 'Agricultural support', colorScheme, () => _showSupportDialog(context, colorScheme)),
-                    _buildSettingsTile('Privacy Policy', 'Data protection', colorScheme, () => _showPrivacyPolicy(context, colorScheme)),
+                    _buildSettingsTile(Icons.help_center_rounded, 'Help', 'Step-by-step instructions', colorScheme, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const HelpScreen()))),
+                    _buildSettingsTile(Icons.support_agent_rounded, 'Help Center', 'Agricultural support', colorScheme, () => _showSupportDialog(context, colorScheme)),
+                    _buildSettingsTile(Icons.privacy_tip_rounded, 'Privacy Policy', 'Data protection', colorScheme, () => _showPrivacyPolicy(context, colorScheme)),
                   ], theme, colorScheme),
                   
                   const SizedBox(height: 100),
@@ -126,19 +173,20 @@ class SettingsScreen extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.05)),
       ),
       child: Column(children: children),
     );
   }
 
-  Widget _buildSettingsTile(String title, String sub, ColorScheme colorScheme, VoidCallback onTap) {
+  Widget _buildSettingsTile(IconData icon, String title, String sub, ColorScheme colorScheme, VoidCallback onTap) {
     return ListTile(
       onTap: onTap,
-      title: Text(title, style: TextStyle(color: colorScheme.onSurface, fontSize: 15, fontWeight: FontWeight.w600)),
+      leading: Icon(icon, color: colorScheme.primary, size: 22),
+      title: Text(title, style: TextStyle(color: colorScheme.onSurface, fontSize: 15, fontWeight: FontWeight.w700)),
       subtitle: Text(sub, style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.4), fontSize: 12, fontWeight: FontWeight.w500)),
-      trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.primary, size: 24),
+      trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.onSurface.withValues(alpha: 0.2), size: 20),
     );
   }
 

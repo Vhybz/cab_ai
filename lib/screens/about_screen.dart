@@ -8,15 +8,18 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFFFF),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
           SliverAppBar(
-            expandedHeight: 120,
+            expandedHeight: 150,
             pinned: true,
-            backgroundColor: const Color(0xFF2E7D32),
+            backgroundColor: colorScheme.primary,
             elevation: 0,
             surfaceTintColor: Colors.transparent,
             centerTitle: true,
@@ -31,26 +34,48 @@ class AboutScreen extends StatelessWidget {
               centerTitle: true,
               title: Text(
                 'About'.toUpperCase(),
-                style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 10, letterSpacing: 3),
-              ),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
-                  ),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900, 
+                  color: Colors.white, 
+                  fontSize: 10, 
+                  letterSpacing: 3
                 ),
+              ),
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          colorScheme.primary.withValues(alpha: 0.8), 
+                          colorScheme.primary
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: -20,
+                    top: -20,
+                    child: Icon(
+                      Icons.info_outline_rounded, 
+                      size: 150, 
+                      color: Colors.white.withValues(alpha: 0.05)
+                    ),
+                  ),
+                ],
               ),
             ),
             actions: [
               IconButton(
                 icon: Icon(
-                  Theme.of(context).brightness == Brightness.light ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  theme.brightness == Brightness.light ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
                   color: Colors.white,
                   size: 20,
                 ),
-                onPressed: () => provider.toggleTheme(Theme.of(context).brightness == Brightness.light),
+                onPressed: () => provider.toggleTheme(theme.brightness == Brightness.light),
               ),
               const SizedBox(width: 8),
             ],
@@ -64,54 +89,111 @@ class AboutScreen extends StatelessWidget {
                   Center(
                     child: Column(
                       children: [
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE8F5E9),
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: Image.asset(
-                              'assets/images/c10.jpg',
-                              fit: BoxFit.cover,
+                        Hero(
+                          tag: 'app_logo',
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: theme.cardColor,
+                              borderRadius: BorderRadius.circular(28),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                )
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(28),
+                              child: Image.asset(
+                                'assets/images/c10.jpg',
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(height: 24),
-                        const Text(
-                          'Cabbage disease classification app',
+                        Text(
+                          'Cabbage Doctor AI',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20), letterSpacing: -0.5),
+                          style: TextStyle(
+                            fontSize: 28, 
+                            fontWeight: FontWeight.w900, 
+                            color: colorScheme.onSurface, 
+                            letterSpacing: -1
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFBC02D).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
+                            color: colorScheme.secondary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.2)),
                           ),
-                          child: const Text(
+                          child: Text(
                             'v1.0.1 STABLE',
-                            style: TextStyle(color: Color(0xFFFBC02D), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1),
+                            style: TextStyle(
+                              color: colorScheme.secondary, 
+                              fontSize: 10, 
+                              fontWeight: FontWeight.w900, 
+                              letterSpacing: 1
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 64),
-                  _buildSection('OUR MISSION', 'Empowering Ghanaian farmers with AI to secure food production and improve yields through cutting-edge diagnostics.'),
-                  _buildSection('DEVELOPMENT TEAM', 'Crafted by Final Year IT Students from UENR, Sunyani. Our team is dedicated to solving real-world agricultural challenges using technology.'),
-                  _buildSection('CORE TECHNOLOGY', 'The platform leverages Flutter for multi-platform reach, Google Gemini for expert agricultural advice, and Supabase for secure data orchestration.'),
                   
-                  const SizedBox(height: 64),
-                  const Divider(color: Color(0xFFE8F5E9)),
+                  const SizedBox(height: 56),
+                  _buildSection(
+                    context,
+                    'OUR MISSION', 
+                    'Empowering Ghanaian farmers with AI to secure food production and improve yields through cutting-edge diagnostics.',
+                    Icons.auto_awesome_rounded
+                  ),
+                  _buildSection(
+                    context,
+                    'DEVELOPMENT TEAM', 
+                    'Crafted by Final Year IT Students from UENR, Sunyani. Our team is dedicated to solving real-world agricultural challenges using technology.',
+                    Icons.groups_rounded
+                  ),
+                  _buildSection(
+                    context,
+                    'CORE TECHNOLOGY', 
+                    'The platform leverages Flutter for multi-platform reach, Google Gemini for expert agricultural advice, and Supabase for secure data orchestration.',
+                    Icons.psychology_rounded
+                  ),
+                  
                   const SizedBox(height: 32),
+                  const Divider(height: 1),
+                  const SizedBox(height: 32),
+                  
                   Center(
-                    child: Text(
-                      '© ${DateTime.now().year} UENR IT STUDENTS'.toUpperCase(),
-                      style: TextStyle(color: const Color(0xFF1B5E20).withValues(alpha: 0.2), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 2),
+                    child: Column(
+                      children: [
+                        Text(
+                          'POWERED BY UENR IT'.toUpperCase(),
+                          style: TextStyle(
+                            color: colorScheme.onSurface.withValues(alpha: 0.3), 
+                            fontSize: 10, 
+                            fontWeight: FontWeight.w900, 
+                            letterSpacing: 2
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '© ${DateTime.now().year} ALL RIGHTS RESERVED',
+                          style: TextStyle(
+                            color: colorScheme.onSurface.withValues(alpha: 0.15), 
+                            fontSize: 9, 
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 64),
@@ -124,22 +206,56 @@ class AboutScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSection(String title, String content) {
+  Widget _buildSection(BuildContext context, String title, String content, IconData icon) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Padding(
-      padding: const EdgeInsets.only(bottom: 48.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 2),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            content,
-            style: const TextStyle(color: Colors.black54, fontSize: 16, height: 1.6, fontWeight: FontWeight.w500),
-          ),
-        ],
+      padding: const EdgeInsets.only(bottom: 32.0),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: colorScheme.onSurface.withValues(alpha: 0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 20, color: colorScheme.primary),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: colorScheme.primary, 
+                    fontSize: 11, 
+                    fontWeight: FontWeight.w900, 
+                    letterSpacing: 1.5
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              content,
+              style: TextStyle(
+                color: colorScheme.onSurface.withValues(alpha: 0.7), 
+                fontSize: 15, 
+                height: 1.6, 
+                fontWeight: FontWeight.w500
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

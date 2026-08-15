@@ -206,6 +206,23 @@ class _ResultScreenState extends State<ResultScreen> {
                     ),
                   ],
                   
+                  const SizedBox(height: 48),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        provider.tr('Friendly Tip: For the best results, please take a clear photo of the leaf. Occasionally, other objects might be mistaken for a cabbage leaf.'),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: colorScheme.onSurface.withValues(alpha: 0.4),
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  
                   const SizedBox(height: 100),
                 ],
               ),

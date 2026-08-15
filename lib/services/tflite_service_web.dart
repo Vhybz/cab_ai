@@ -1,9 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'tflite_service_interface.dart';
-import 'package:image_picker/image_picker.dart';
 
 class TFLiteService implements TFLiteServiceInterface {
   final List<String> _labels = [
@@ -44,6 +42,16 @@ class TFLiteService implements TFLiteServiceInterface {
         final dynamic data = jsonDecode(apiResponse.body);
         String label = data['disease'] ?? 'Healthy';
         double confidence = (data['confidence'] as num?)?.toDouble() ?? 0.0;
+
+        // Threshold check: if confidence is too low, treat as unidentified
+        if (confidence < 0.67) {
+          return {
+            'label': 'Unidentified / Not a Leaf',
+            'confidence': confidence,
+            'index': 3,
+            'isLeaf': false,
+          };
+        }
 
         return {
           'label': label,

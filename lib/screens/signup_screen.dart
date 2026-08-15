@@ -124,9 +124,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context, listen: false);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFFFF),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -134,208 +136,282 @@ class _SignUpScreenState extends State<SignUpScreen> {
         leading: Padding(
           padding: const EdgeInsets.only(left: 8.0),
           child: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF2E7D32), size: 20),
+            icon: Icon(Icons.arrow_back_ios_new_rounded, color: colorScheme.primary, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
         ),
         centerTitle: true,
         title: Text(
           'Registration'.toUpperCase(),
-          style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1B5E20), fontSize: 10, letterSpacing: 3),
+          style: TextStyle(fontWeight: FontWeight.w900, color: colorScheme.primary, fontSize: 10, letterSpacing: 3),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Create Account', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20), letterSpacing: -1)),
-              const SizedBox(height: 8),
-              Text('Join the agricultural digital network.', style: TextStyle(color: Colors.black.withValues(alpha: 0.4), fontSize: 16, fontWeight: FontWeight.w500)),
-              const SizedBox(height: 40),
+      body: Stack(
+        children: [
+          Positioned(
+            top: -50,
+            right: -50,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colorScheme.primary.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ShaderMask(
+                    shaderCallback: (bounds) => LinearGradient(
+                      colors: [colorScheme.primary, colorScheme.primary.withValues(alpha: 0.7)],
+                    ).createShader(bounds),
+                    child: const Text(
+                      'Join the Network', 
+                      style: TextStyle(
+                        fontSize: 36, 
+                        fontWeight: FontWeight.w800, 
+                        color: Colors.white, 
+                        letterSpacing: -1.5,
+                        height: 1.1,
+                      )
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Create your farmer profile to get started.', 
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.4), 
+                      fontSize: 16, 
+                      fontWeight: FontWeight.w500,
+                    )
+                  ),
+                  const SizedBox(height: 40),
 
-              Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLabel('BASIC INFORMATION'),
-                    Row(
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: _buildField(
-                            _firstNameController, 
-                            'First Name', 
-                            'Enter first name',
-                            Icons.person_outline, 
-                            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]'))],
+                        _buildSectionHeader('BASIC INFORMATION', Icons.person_rounded),
+                        _buildCard([
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildField(
+                                  _firstNameController, 
+                                  'First Name', 
+                                  'John',
+                                  Icons.person_outline, 
+                                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]'))],
+                                  validator: (v) => (v == null || v.isEmpty) ? 'Required' : null
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildField(
+                                  _surnameController, 
+                                  'Surname', 
+                                  'Doe',
+                                  Icons.badge_outlined, 
+                                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]'))],
+                                  validator: (v) => (v == null || v.isEmpty) ? 'Required' : null
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          _buildField(
+                            _dobController, 
+                            'Date of Birth', 
+                            'Select date',
+                            Icons.calendar_today_rounded, 
+                            readOnly: true, 
+                            onTap: () => _selectDate(context),
                             validator: (v) => (v == null || v.isEmpty) ? 'Required' : null
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildField(
-                            _surnameController, 
-                            'Surname', 
-                            'Enter surname',
-                            Icons.badge_outlined, 
-                            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]'))],
-                            validator: (v) => (v == null || v.isEmpty) ? 'Required' : null
+                          const SizedBox(height: 20),
+                          _buildDropdown('Gender', 'Select gender', Icons.wc_rounded, ['Male', 'Female', 'Other'], _selectedGender, (v) => setState(() => _selectedGender = v), validator: (v) => v == null ? 'Required' : null),
+                        ]),
+                        
+                        const SizedBox(height: 32),
+                        _buildSectionHeader('FARMING PROFILE', Icons.agriculture_rounded),
+                        _buildCard([
+                          _buildDropdown('Profession', 'Select profession', Icons.work_outline, _professions, _selectedProfession, (v) => setState(() => _selectedProfession = v), validator: (v) => v == null ? 'Required' : null),
+                          const SizedBox(height: 20),
+                          _buildDropdown('Farm Region', 'Select region', Icons.map_outlined, _regions.keys.toList(), _selectedRegion, (v) {
+                            setState(() => _selectedRegion = v);
+                            if (v != null) provider.setLocation(_regions[v]![0], _regions[v]![1], v);
+                          }, validator: (v) => v == null ? 'Required' : null),
+                        ]),
+
+                        const SizedBox(height: 32),
+                        _buildSectionHeader('CONTACT & SECURITY', Icons.security_rounded),
+                        _buildCard([
+                          _buildField(
+                            _phoneController, 
+                            'Phone Number', 
+                            '024XXXXXXX',
+                            Icons.phone_android_rounded, 
+                            keyboardType: TextInputType.phone,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Required';
+                              if (v.length < 10) return 'Must be 10 digits';
+                              return null;
+                            }
                           ),
+                          const SizedBox(height: 20),
+                          _buildField(
+                            _emailController, 
+                            'Email Address', 
+                            'farmer@example.com',
+                            Icons.alternate_email_rounded, 
+                            keyboardType: TextInputType.emailAddress, 
+                            inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Required';
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v)) return 'Invalid email format';
+                              return null;
+                            }
+                          ),
+                          const SizedBox(height: 20),
+                          _buildField(
+                            _passwordController, 
+                            'Password', 
+                            'Min 6 characters',
+                            Icons.lock_outline_rounded, 
+                            obscure: _obscurePassword, 
+                            suffix: _toggleIcon(() => setState(() => _obscurePassword = !_obscurePassword), _obscurePassword), 
+                            onChanged: _checkPasswordStrength,
+                            inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
+                            validator: (v) => (v == null || v.length < 6) ? 'Min 6 characters' : null
+                          ),
+                          
+                          if (_showStrength) ...[
+                            const SizedBox(height: 8),
+                            ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: _passwordStrength, backgroundColor: colorScheme.primary.withValues(alpha: 0.1), color: _getStrengthColor(), minHeight: 6)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Password Strength', 
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _getStrengthColor())
+                            ),
+                          ],
+
+                          const SizedBox(height: 20),
+                          _buildField(
+                            _confirmPasswordController, 
+                            'Confirm Password', 
+                            'Retype password',
+                            Icons.lock_reset_rounded, 
+                            obscure: _obscureConfirmPassword, 
+                            suffix: _toggleIcon(() => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword), _obscureConfirmPassword), 
+                            validator: (v) => v != _passwordController.text ? 'Passwords do not match' : null,
+                            inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
+                          ),
+                        ]),
+                        
+                        const SizedBox(height: 48),
+                        ElevatedButton(
+                          onPressed: _isLoading ? null : _handleSignUp,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, 64),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            elevation: 8,
+                            shadowColor: colorScheme.primary.withValues(alpha: 0.4),
+                          ),
+                          child: _isLoading 
+                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+                            : const Text('Complete Registration', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, letterSpacing: 0.5)),
                         ),
+                        const SizedBox(height: 40),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    _buildField(
-                      _dobController, 
-                      'Date of Birth', 
-                      'Select date',
-                      Icons.calendar_today_rounded, 
-                      readOnly: true, 
-                      onTap: () => _selectDate(context),
-                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null
-                    ),
-                    const SizedBox(height: 20),
-                    _buildDropdown('Gender', 'Select gender', Icons.wc_rounded, ['Male', 'Female', 'Other'], _selectedGender, (v) => setState(() => _selectedGender = v), validator: (v) => v == null ? 'Required' : null),
-                    
-                    const SizedBox(height: 32),
-                    _buildLabel('FARMING PROFILE'),
-                    _buildDropdown('Profession', 'Select profession', Icons.work_outline, _professions, _selectedProfession, (v) => setState(() => _selectedProfession = v), validator: (v) => v == null ? 'Required' : null),
-                    const SizedBox(height: 20),
-                    _buildDropdown('Farm Region', 'Select region', Icons.map_outlined, _regions.keys.toList(), _selectedRegion, (v) {
-                      setState(() => _selectedRegion = v);
-                      if (v != null) provider.setLocation(_regions[v]![0], _regions[v]![1], v);
-                    }, validator: (v) => v == null ? 'Required' : null),
-
-                    const SizedBox(height: 32),
-                    _buildLabel('CONTACT & SECURITY'),
-                    _buildField(
-                      _phoneController, 
-                      'Phone Number', 
-                      'Enter 10-digit number',
-                      Icons.phone_android_rounded, 
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Required';
-                        if (v.length < 10) return 'Must be 10 digits';
-                        return null;
-                      }
-                    ),
-                    const SizedBox(height: 20),
-                    _buildField(
-                      _emailController, 
-                      'Email Address', 
-                      'Enter email address',
-                      Icons.alternate_email_rounded, 
-                      keyboardType: TextInputType.emailAddress, 
-                      inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Required';
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v)) return 'Invalid email format';
-                        return null;
-                      }
-                    ),
-                    const SizedBox(height: 20),
-                    _buildField(
-                      _passwordController, 
-                      'Password', 
-                      'Enter password',
-                      Icons.lock_outline_rounded, 
-                      obscure: _obscurePassword, 
-                      suffix: _toggleIcon(() => setState(() => _obscurePassword = !_obscurePassword), _obscurePassword), 
-                      onChanged: _checkPasswordStrength,
-                      inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
-                      validator: (v) => (v == null || v.length < 6) ? 'Min 6 characters' : null
-                    ),
-                    
-                    if (_showStrength) ...[
-                      const SizedBox(height: 8),
-                      ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: _passwordStrength, backgroundColor: const Color(0xFFE8F5E9), color: _getStrengthColor(), minHeight: 4)),
-                    ],
-
-                    const SizedBox(height: 20),
-                    _buildField(
-                      _confirmPasswordController, 
-                      'Confirm Password', 
-                      'Retype password',
-                      Icons.lock_reset_rounded, 
-                      obscure: _obscureConfirmPassword, 
-                      suffix: _toggleIcon(() => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword), _obscureConfirmPassword), 
-                      validator: (v) => v != _passwordController.text ? 'Passwords do not match' : null,
-                      inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
-                    ),
-                    
-                    const SizedBox(height: 48),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _handleSignUp,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 64),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 4,
-                        shadowColor: const Color(0xFF2E7D32).withValues(alpha: 0.3),
-                      ),
-                      child: _isLoading 
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                        : const Text('Complete Registration', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                    ),
-                    const SizedBox(height: 40),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildLabel(String text) => Padding(padding: const EdgeInsets.only(bottom: 12.0, left: 4), child: Text(text, style: TextStyle(color: const Color(0xFF1B5E20).withValues(alpha: 0.6), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5)));
-
-  Widget _buildField(TextEditingController controller, String label, String hint, IconData icon, {bool readOnly = false, VoidCallback? onTap, bool obscure = false, Widget? suffix, TextInputType? keyboardType, Function(String)? onChanged, String? Function(String?)? validator, List<TextInputFormatter>? inputFormatters}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSectionHeader(String text, IconData icon) => Padding(
+    padding: const EdgeInsets.only(bottom: 16.0, left: 4), 
+    child: Row(
       children: [
-        TextFormField(
-          controller: controller, readOnly: readOnly, onTap: onTap, obscureText: obscure, keyboardType: keyboardType, onChanged: onChanged, validator: validator,
-          inputFormatters: inputFormatters,
-          style: const TextStyle(color: Color(0xFF1B5E20), fontSize: 15, fontWeight: FontWeight.w600),
-          decoration: InputDecoration(
-            labelText: label,
-            hintText: hint, 
-            hintStyle: TextStyle(color: const Color(0xFF2E7D32).withValues(alpha: 0.4)), 
-            prefixIcon: Icon(icon, color: const Color(0xFF2E7D32), size: 20), 
-            suffixIcon: suffix,
-            filled: true, fillColor: const Color(0xFFF1F8E9), contentPadding: const EdgeInsets.all(20),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: const Color(0xFF2E7D32).withValues(alpha: 0.1))),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2)),
-            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFD32F2F))),
-            focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFD32F2F), width: 2)),
-          ),
+        Icon(icon, size: 16, color: const Color(0xFF1B5E20).withValues(alpha: 0.4)),
+        const SizedBox(width: 8),
+        Text(
+          text, 
+          style: TextStyle(
+            color: const Color(0xFF1B5E20).withValues(alpha: 0.4), 
+            fontSize: 10, 
+            fontWeight: FontWeight.w900, 
+            letterSpacing: 1.5
+          )
         ),
       ],
+    )
+  );
+
+  Widget _buildCard(List<Widget> children) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F8E9).withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.05)),
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildField(TextEditingController controller, String label, String hint, IconData icon, {bool readOnly = false, VoidCallback? onTap, bool obscure = false, Widget? suffix, TextInputType? keyboardType, Function(String)? onChanged, String? Function(String?)? validator, List<TextInputFormatter>? inputFormatters}) {
+    return TextFormField(
+      controller: controller, readOnly: readOnly, onTap: onTap, obscureText: obscure, keyboardType: keyboardType, onChanged: onChanged, validator: validator,
+      inputFormatters: inputFormatters,
+      style: const TextStyle(color: Color(0xFF1B5E20), fontSize: 15, fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: const Color(0xFF1B5E20).withValues(alpha: 0.5), fontWeight: FontWeight.w700),
+        hintText: hint, 
+        hintStyle: TextStyle(color: const Color(0xFF2E7D32).withValues(alpha: 0.2)), 
+        prefixIcon: Icon(icon, color: const Color(0xFF2E7D32), size: 20), 
+        suffixIcon: suffix,
+        filled: true, fillColor: Colors.white, contentPadding: const EdgeInsets.all(20),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: const Color(0xFF2E7D32).withValues(alpha: 0.05))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 1.5)),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFD32F2F))),
+        focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFD32F2F), width: 1.5)),
+      ),
     );
   }
 
   Widget _buildDropdown(String label, String hint, IconData icon, List<String> items, String? value, Function(String?) onChanged, {String? Function(String?)? validator}) {
     return DropdownButtonFormField<String>(
-      initialValue: value, items: items.map((i) => DropdownMenuItem(value: i, child: Text(i, style: const TextStyle(color: Color(0xFF1B5E20), fontWeight: FontWeight.w600)))).toList(), onChanged: onChanged,
+      value: value, items: items.map((i) => DropdownMenuItem(value: i, child: Text(i, style: const TextStyle(color: Color(0xFF1B5E20), fontWeight: FontWeight.w600, fontSize: 14)))).toList(), onChanged: onChanged,
       validator: validator,
-      dropdownColor: Colors.white, icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF2E7D32)),
+      dropdownColor: Colors.white, icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF2E7D32)),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: TextStyle(color: const Color(0xFF1B5E20).withValues(alpha: 0.5), fontWeight: FontWeight.w700),
         hintText: hint, 
-        hintStyle: TextStyle(color: const Color(0xFF2E7D32).withValues(alpha: 0.4)), 
+        hintStyle: TextStyle(color: const Color(0xFF2E7D32).withValues(alpha: 0.2)), 
         prefixIcon: Icon(icon, color: const Color(0xFF2E7D32), size: 20),
-        filled: true, fillColor: const Color(0xFFF1F8E9), contentPadding: const EdgeInsets.all(20),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: const Color(0xFF2E7D32).withValues(alpha: 0.1))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2)),
+        filled: true, fillColor: Colors.white, contentPadding: const EdgeInsets.all(20),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: const Color(0xFF2E7D32).withValues(alpha: 0.05))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 1.5)),
         errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFD32F2F))),
-        focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFD32F2F), width: 2)),
+        focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFD32F2F), width: 1.5)),
       ),
     );
   }

@@ -436,8 +436,9 @@ class AppProvider with ChangeNotifier {
         _analysisMessage = 'EXTRACTING FEATURES...';
         notifyListeners();
         
-        // Pass the image path as a string, but the service now handles bytes internally
-        final result = await _tfLiteService.classifyImage(imagePath);
+        // For web, read bytes directly to avoid blob URL issues
+        final dynamic input = kIsWeb ? await pickedFile.readAsBytes() : imagePath;
+        final result = await _tfLiteService.classifyImage(input);
         
         await Future.delayed(const Duration(milliseconds: 500));
         _analysisMessage = 'MODEL DECIDING...';
@@ -865,6 +866,10 @@ class AppProvider with ChangeNotifier {
       'Our AI analyzes the biological features of the leaf.': 'Yɛn AI no bɛhwehwɛ nhaban no mu yiye.',
       'View Result': 'Hwɛ deɛ ɛfiri mu baeɛ',
       'Get instant diagnosis and treatment recommendations.': 'Nya yadeɛ no din ne snea wɔsa no ntɛm paa.',
+      'Friendly Tip: For the best results, please take a clear photo of the leaf. Occasionally, other objects might be mistaken for a cabbage leaf.': 'Afutuo Pa: Yi mfonini no fann ma nhwehwɛmu no nyɛ pɛpɛɛpɛ. Ɛtɔ da bi a, nneɛma foforɔ bɛtumi ayɛ sɛ kabeji nhaban.',
+      'Cabbage Focus': 'Kabeji Nko Ara',
+      'To get the most accurate results, please ensure you are scanning a cabbage leaf. Other objects or non-cabbage plants might be misidentified as diseased cabbage.': 'Boa yɛn na yɛmmoa wo! Sɛ wopɛ sɛ yenya yadeɛ no din pɛpɛɛpɛ a, yɛpa wo kyɛw scan kabeji nhaban nko ara. Ɛtɔ da bi a, AI no bɛtumi abu nnɔbae foforɔ sɛ kabeji a ayɛ yadeɛ, enti kabeji nhaban nko ara a wobɛscan no bɛboa wo afuo paa.',
+      'PROCEED': 'KƆ SO',
     };
 
     return twiMap[key] ?? key;

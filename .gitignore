@@ -43,3 +43,8 @@ app.*.map.json
 assets/cab.env
 .env
 google-services.json
+
+# Gradle caches
+.gradle_home/
+.gradle/
+**/android/.gradle_home/
